@@ -1,0 +1,19 @@
+[project]
+name = "salsa"
+version = "0.1.0"
+description = "Simple timesheet CLI"
+authors = [{name = "Andrea Manenti", email = "andrea.manenti@proton.me"}]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.uv]
+package = true
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.12",
+]
+
+[project.scripts]
+salsa = "salsa.__main__:main"
