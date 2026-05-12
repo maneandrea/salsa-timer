@@ -17,3 +17,6 @@ dev = [
 
 [project.scripts]
 salsa = "salsa.__main__:main"
+
+[tool.ruff]
+line-length = 120

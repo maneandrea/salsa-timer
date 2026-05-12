@@ -12,7 +12,7 @@ Usage:
 import argparse
 
 from salsa.query import salsa_clear, salsa_log, salsa_status
-from salsa.timer import salsa_start, salsa_stop
+from salsa.timer import salsa_pause, salsa_resume, salsa_start, salsa_stop
 
 
 def main() -> None:
@@ -20,13 +20,9 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="command")
 
     start_parser = subparsers.add_parser("start", help="Start a new timesheet entry")
-    start_parser.add_argument(
-        "description", nargs="*", help="Description of the task (optional)"
-    )
+    start_parser.add_argument("description", nargs="*", help="Description of the task (optional)")
 
-    _stop_parser = subparsers.add_parser(
-        "stop", help="Stop the current timesheet entry"
-    )
+    _stop_parser = subparsers.add_parser("stop", help="Stop the current timesheet entry")
 
     log_parser = subparsers.add_parser("log", help="Show log entries")
     log_parser.add_argument(
@@ -37,11 +33,11 @@ def main() -> None:
     )
 
     _status_parser = subparsers.add_parser("status", help="Show current session status")
+    _pause_parser = subparsers.add_parser("pause", help="Pause the current task without ending it")
+    _resume_parser = subparsers.add_parser("resume", help="Resume a paused task")
 
     clear_parser = subparsers.add_parser("clear", help="Cleanup data")
-    clear_parser.add_argument(
-        "scope", help="What to eliminate", choices=["all", "today"]
-    )
+    clear_parser.add_argument("scope", help="What to eliminate", choices=["all", "today"])
 
     args = parser.parse_args()
 
@@ -56,6 +52,10 @@ def main() -> None:
         salsa_status()
     elif args.command == "clear":
         salsa_clear(args.scope)
+    elif args.command == "pause":
+        salsa_pause()
+    elif args.command == "resume":
+        salsa_resume()
     else:
         salsa_status()
 

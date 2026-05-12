@@ -1,8 +1,18 @@
 import os
+from collections import defaultdict
 from datetime import date, datetime, timedelta
 from typing import Literal
+from uuid import UUID
 
-from salsa.utils import format_td, get_all_paths, get_log_iter, get_today_path
+from salsa.types import Event, LogEntry, SessionEntry
+from salsa.utils import (
+    format_td,
+    format_td_num,
+    get_all_paths,
+    get_last_entry,
+    get_log_iter,
+    get_today_path,
+)
 
 MAX_DESC_LEN = 50
 
@@ -29,78 +39,98 @@ def salsa_log(since: str | None = None) -> None:
     else:
         since_dt = date.fromisoformat(since)
 
-    entries = []
+    grouped: dict[UUID, list[LogEntry]] = defaultdict(list)
     for e in get_log_iter():
         if e["datetime"].date() >= since_dt:
-            entries.append(e)
+            grouped[e["task_id"]].append(e)
         else:
             break
-    sessions = []
-    current = None
-    for entry in reversed(entries):
-        if entry["event"] == "start":
-            if current is None:
-                current = {
-                    "start": entry["datetime"],
-                    "description": entry["description"],
-                }
+
+    sessions: list[SessionEntry] = []
+    for group in grouped.values():
+        current = None
+        accumulator = timedelta(0)
+        start = None
+        end = None
+        task_id = None
+        description = None
+        paused = True
+        for e in sorted(group, key=lambda x: x["datetime"]):
+            if e["event"] == Event.START:
+                start = e["datetime"]
+                task_id = e["task_id"]
+                description = e["description"]
+            elif e["event"] == Event.STOP:
+                end = e["datetime"]
+
+            if e["event"] in (Event.START, Event.RESUME):
+                current = e["datetime"]
+                paused = False
+            elif current:
+                accumulator += e["datetime"] - current
+                current = None
+                paused = True
             else:
-                # orphan start, treat as instant session
-                sessions.append(
-                    {
-                        "start": entry["datetime"],
-                        "end": entry["datetime"],
-                        "description": entry["description"],
-                    }
+                continue
+        if start and task_id and description:
+            sessions.append(
+                SessionEntry(
+                    start=start,
+                    end=end,
+                    task_id=task_id,
+                    duration=accumulator,
+                    description=description,
+                    paused=paused,
+                    current=current,
                 )
-                current = None
-        elif entry["event"] == "end":
-            if current is not None:
-                current["end"] = entry["datetime"]
-                sessions.append(current)
-                current = None
-            else:
-                # orphan end, ignore
-                pass
-    if current is not None:
-        # running session
-        current["end"] = None
-        sessions.append(current)
+            )
+
     if not sessions:
         print(f"No entries since {since_dt.isoformat()}.")
         return
+
+    TASK_W = 7
+    TIME_W = len("%Y-%m-%d %H:%M:%S") + len("%H:%M:%S") + 5
+    DUR_W = 8
+    print(f"{'TASK':<{TASK_W}} | {'TIME':<{TIME_W}} | {'DURATION':<{DUR_W}} | {'DESCRIPTION':<{MAX_DESC_LEN}}")
+    print(f"{'-' * TASK_W} + {'-' * TIME_W} + {'-' * DUR_W} + {'-' * MAX_DESC_LEN}")
     for sess in sessions:
         start = sess["start"].strftime("%Y-%m-%d %H:%M:%S")
-        end = sess["end"].strftime("%H:%M:%S") if sess["end"] else "running…"
-        if sess["end"]:
-            duration = str(sess["end"] - sess["start"]).split(".")[0]
+        end = sess["end"].strftime("%H:%M:%S") if sess["end"] else ("paused… " if sess["paused"] else "running…")
+        if sess["end"] or sess["paused"]:
+            duration = sess["duration"]
+        elif sess["current"]:
+            duration = sess["duration"] + datetime.now() - sess["current"]
         else:
-            duration = str(datetime.now() - sess["start"]).split(".")[0]
+            duration = datetime.now() - sess["start"]
         desc = sess["description"]
         if len(desc) > MAX_DESC_LEN:
             desc = desc[: MAX_DESC_LEN - 1] + "…"
 
-        print(f"{start} - {end} | {duration} | {desc}")
+        duration_str = format_td_num(duration)
+        task_id_str = f"{sess['task_id'].hex[:6]}…"
+        print(f"{task_id_str} | {start} - {end} | {duration_str} | {desc}")
 
 
 def salsa_status() -> None:
-    active = None
-    last_desc = "none"
-    duration_td = timedelta(0)
-    for entry in get_log_iter():
-        if entry["event"] == "start":
-            active = entry
-            last_desc = entry["description"]
-            duration_td = datetime.now() - entry["datetime"]
-            break
-        elif entry["event"] == "end":
-            last_desc = entry["description"]
-            break
-    if active:
-        duration = format_td(duration_td)
-        print(f"\033[32m● \033[1mactive\033[0m {active['description']} ({duration})")
-    else:
-        print(f"\033[31m● \033[1midle\033[0m (last task: {last_desc})")
+    last = get_last_entry([Event.START, Event.STOP, Event.PAUSE, Event.RESUME])
+    if not last:
+        print("\033[31m● \033[1mstopped\033[0m (last task: none)")
+        return
+
+    event = last["event"]
+    duration_td = datetime.now() - last["datetime"]
+    task_id = last["task_id"]
+    description = last["description"]
+    match event:
+        case Event.START | Event.RESUME:
+            duration = format_td(duration_td)
+            print(f"\033[32m● \033[1mrunning\033[0m {description} ({task_id.hex[:6]}…) | {duration}")
+        case Event.PAUSE:
+            duration = format_td(duration_td)
+            print(f"\033[33m● \033[1mpaused\033[0m {description} ({task_id.hex[:6]}…)")
+        case _:
+            print(f"\033[31m● \033[1mstopped\033[0m (last task: {description})")
 
 
 def salsa_clear(scope: Literal["all", "today"]):
