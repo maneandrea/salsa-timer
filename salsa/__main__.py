@@ -11,7 +11,7 @@ Usage:
 
 import argparse
 
-from salsa.query import salsa_clear, salsa_log, salsa_status
+from salsa.query import salsa_clear, salsa_log, salsa_show, salsa_status
 from salsa.timer import salsa_pause, salsa_resume, salsa_start, salsa_stop
 
 
@@ -35,6 +35,7 @@ def main() -> None:
     _status_parser = subparsers.add_parser("status", help="Show current session status")
     _pause_parser = subparsers.add_parser("pause", help="Pause the current task without ending it")
     _resume_parser = subparsers.add_parser("resume", help="Resume a paused task")
+    _show_parser = subparsers.add_parser("show", help="Shows the status and continuously updates if running")
 
     clear_parser = subparsers.add_parser("clear", help="Cleanup data")
     clear_parser.add_argument("scope", help="What to eliminate", choices=["all", "today"])
@@ -56,8 +57,10 @@ def main() -> None:
         salsa_pause()
     elif args.command == "resume":
         salsa_resume()
+    elif args.command == "show":
+        salsa_show()
     else:
-        salsa_status()
+        salsa_show()
 
 
 if __name__ == "__main__":

@@ -1,6 +1,8 @@
 import os
 from collections import defaultdict
+from collections.abc import Callable
 from datetime import date, datetime, timedelta
+from time import sleep
 from typing import Literal
 from uuid import UUID
 
@@ -112,7 +114,7 @@ def salsa_log(since: str | None = None) -> None:
         print(f"{task_id_str} | {start} - {end} | {duration_str} | {desc}")
 
 
-def salsa_status() -> None:
+def _salsa_status(on_active: Callable[[LogEntry], None]) -> None:
     last = get_last_entry([Event.START, Event.STOP, Event.PAUSE, Event.RESUME])
     if not last:
         print("\033[31m● \033[1mstopped\033[0m (last task: none)")
@@ -125,12 +127,40 @@ def salsa_status() -> None:
     match event:
         case Event.START | Event.RESUME:
             duration = format_td(duration_td)
-            print(f"\033[32m● \033[1mrunning\033[0m {description} ({task_id.hex[:6]}…) | {duration}")
+            print(
+                f"\033[32m● \033[1mrunning\033[0m {description} ({task_id.hex[:6]}…) | {duration}", end="", flush=True
+            )
+            try:
+                on_active(last)
+            except KeyboardInterrupt:
+                print("")
+                return
         case Event.PAUSE:
             duration = format_td(duration_td)
             print(f"\033[33m● \033[1mpaused\033[0m {description} ({task_id.hex[:6]}…)")
         case _:
             print(f"\033[31m● \033[1mstopped\033[0m (last task: {description})")
+
+
+def salsa_status() -> None:
+    _salsa_status(lambda _: print(""))
+
+
+def salsa_show() -> None:
+
+    def _go(entry):
+
+        task_id = entry["task_id"]
+        description = entry["description"]
+        while True:
+            sleep(1)
+            duration_td = datetime.now() - entry["datetime"]
+            duration = format_td(duration_td)
+            print(
+                f"\r\033[32m● \033[1mrunning\033[0m {description} ({task_id.hex[:6]}…) | {duration}", end="", flush=True
+            )
+
+    _salsa_status(_go)
 
 
 def salsa_clear(scope: Literal["all", "today"]):
