@@ -11,6 +11,7 @@ from salsa.utils import (
     format_td,
     format_td_num,
     get_all_paths,
+    get_group,
     get_last_entry,
     get_log_iter,
     get_today_path,
@@ -23,6 +24,44 @@ def get_most_recent_description() -> str | None:
     for entry in get_log_iter():
         if entry["description"]:
             return entry["description"]
+    return
+
+
+def _compute_session(group: list[LogEntry]) -> SessionEntry | None:
+    current = None
+    accumulator = timedelta(0)
+    start = None
+    end = None
+    task_id = None
+    description = None
+    paused = True
+    for e in sorted(group, key=lambda x: x["datetime"]):
+        if e["event"] == Event.START:
+            start = e["datetime"]
+            task_id = e["task_id"]
+            description = e["description"]
+        elif e["event"] == Event.STOP:
+            end = e["datetime"]
+
+        if e["event"] in (Event.START, Event.RESUME):
+            current = e["datetime"]
+            paused = False
+        elif current:
+            accumulator += e["datetime"] - current
+            current = None
+            paused = True
+        else:
+            continue
+    if start and task_id and description:
+        return SessionEntry(
+            start=start,
+            end=end,
+            task_id=task_id,
+            duration=accumulator,
+            description=description,
+            paused=paused,
+            current=current,
+        )
     return
 
 
@@ -50,42 +89,9 @@ def salsa_log(since: str | None = None) -> None:
 
     sessions: list[SessionEntry] = []
     for group in grouped.values():
-        current = None
-        accumulator = timedelta(0)
-        start = None
-        end = None
-        task_id = None
-        description = None
-        paused = True
-        for e in sorted(group, key=lambda x: x["datetime"]):
-            if e["event"] == Event.START:
-                start = e["datetime"]
-                task_id = e["task_id"]
-                description = e["description"]
-            elif e["event"] == Event.STOP:
-                end = e["datetime"]
-
-            if e["event"] in (Event.START, Event.RESUME):
-                current = e["datetime"]
-                paused = False
-            elif current:
-                accumulator += e["datetime"] - current
-                current = None
-                paused = True
-            else:
-                continue
-        if start and task_id and description:
-            sessions.append(
-                SessionEntry(
-                    start=start,
-                    end=end,
-                    task_id=task_id,
-                    duration=accumulator,
-                    description=description,
-                    paused=paused,
-                    current=current,
-                )
-            )
+        session = _compute_session(group)
+        if session:
+            sessions.append(session)
 
     if not sessions:
         print(f"No entries since {since_dt.isoformat()}.")
@@ -114,16 +120,19 @@ def salsa_log(since: str | None = None) -> None:
         print(f"{task_id_str} | {start} - {end} | {duration_str} | {desc}")
 
 
-def _salsa_status(on_active: Callable[[LogEntry], None]) -> None:
+def _salsa_status(on_active: Callable[[LogEntry, timedelta], None]) -> None:
     last = get_last_entry([Event.START, Event.STOP, Event.PAUSE, Event.RESUME])
     if not last:
         print("\033[31m● \033[1mstopped\033[0m (last task: none)")
         return
 
     event = last["event"]
-    duration_td = datetime.now() - last["datetime"]
     task_id = last["task_id"]
     description = last["description"]
+    group = get_group(task_id)
+    session = _compute_session(group)
+    accumulated_td = session["duration"] if session else timedelta(0)
+    duration_td = accumulated_td + datetime.now() - last["datetime"]
     match event:
         case Event.START | Event.RESUME:
             duration = format_td(duration_td)
@@ -131,30 +140,30 @@ def _salsa_status(on_active: Callable[[LogEntry], None]) -> None:
                 f"\033[32m● \033[1mrunning\033[0m {description} ({task_id.hex[:6]}…) | {duration}", end="", flush=True
             )
             try:
-                on_active(last)
+                on_active(last, accumulated_td)
             except KeyboardInterrupt:
                 print("")
                 return
         case Event.PAUSE:
-            duration = format_td(duration_td)
-            print(f"\033[33m● \033[1mpaused\033[0m {description} ({task_id.hex[:6]}…)")
+            accumulated = format_td(accumulated_td)
+            print(f"\033[33m● \033[1mpaused\033[0m {description} ({task_id.hex[:6]}…) | {accumulated}")
         case _:
             print(f"\033[31m● \033[1mstopped\033[0m (last task: {description})")
 
 
 def salsa_status() -> None:
-    _salsa_status(lambda _: print(""))
+    _salsa_status(lambda _, __: print(""))
 
 
 def salsa_show() -> None:
 
-    def _go(entry):
+    def _go(entry, acc_duration):
 
         task_id = entry["task_id"]
         description = entry["description"]
         while True:
             sleep(1)
-            duration_td = datetime.now() - entry["datetime"]
+            duration_td = acc_duration + datetime.now() - entry["datetime"]
             duration = format_td(duration_td)
             print(
                 f"\r\033[32m● \033[1mrunning\033[0m {description} ({task_id.hex[:6]}…) | {duration}", end="", flush=True

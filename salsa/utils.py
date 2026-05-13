@@ -62,6 +62,19 @@ def get_last_entry(expected_states: list[Event]) -> None | LogEntry:
     return None
 
 
+def get_group(task_id: UUID) -> list[LogEntry]:
+    entries = []
+    group_day = None
+    for entry in get_log_iter():
+        if group_day and entry["datetime"].date() != group_day:
+            break
+        if entry["task_id"] == task_id:
+            group_day = entry["datetime"].date()
+            entries.append(entry)
+
+    return entries
+
+
 def is_stopped() -> bool:
     path = get_today_path()
     data = load_data(path)
