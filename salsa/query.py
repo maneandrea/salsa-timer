@@ -65,8 +65,14 @@ def _compute_session(group: list[LogEntry]) -> SessionEntry | None:
     return
 
 
-def salsa_log(since: str | None = None) -> None:
-    """Print log entries since a given date (YYYY-MM-DD). Defaults to today."""
+def salsa_log(since: str | None = None, detailed: bool = False) -> None:
+    """Print log entries since a given date (YYYY-MM-DD). Defaults to today.
+
+    Args:
+        since (str | None): Lower bound date string. Accepts ISO date, "today",
+            "yesterday", "this week", or "this month".
+        detailed (bool): When True, prints individual events below each session row.
+    """
     today = date.today()
 
     if since is None or since == "today":
@@ -87,11 +93,11 @@ def salsa_log(since: str | None = None) -> None:
         else:
             break
 
-    sessions: list[SessionEntry] = []
+    sessions: list[tuple[SessionEntry, list[LogEntry]]] = []
     for group in grouped.values():
         session = _compute_session(group)
         if session:
-            sessions.append(session)
+            sessions.append((session, sorted(group, key=lambda x: x["datetime"])))
 
     if not sessions:
         print(f"No entries since {since_dt.isoformat()}.")
@@ -102,7 +108,7 @@ def salsa_log(since: str | None = None) -> None:
     DUR_W = 8
     print(f"{'TASK':<{TASK_W}} | {'TIME':<{TIME_W}} | {'DURATION':<{DUR_W}} | {'DESCRIPTION':<{MAX_DESC_LEN}}")
     print(f"{'-' * TASK_W} + {'-' * TIME_W} + {'-' * DUR_W} + {'-' * MAX_DESC_LEN}")
-    for sess in sessions:
+    for sess, events in sessions:
         start = sess["start"].strftime("%Y-%m-%d %H:%M:%S")
         end = sess["end"].strftime("%H:%M:%S") if sess["end"] else ("paused… " if sess["paused"] else "running…")
         if sess["end"] or sess["paused"]:
@@ -118,6 +124,14 @@ def salsa_log(since: str | None = None) -> None:
         duration_str = format_td_num(duration)
         task_id_str = f"{sess['task_id'].hex[:6]}…"
         print(f"{task_id_str} | {start} - {end} | {duration_str} | {desc}")
+
+        if detailed:
+            indent = " " * TASK_W + " | "
+            fences = 11 * " " + " | " + DUR_W * " " + " |"
+            for i, ev in enumerate(events):
+                tree = "└─" if i == len(events) - 1 else "├─"
+                ts = ev["datetime"].strftime("%H:%M:%S")
+                print(f"{indent}\033[2m{tree} {ev['event'].value:<6}  {ts}\033[0m{fences}")
 
 
 def _salsa_status(on_active: Callable[[LogEntry, timedelta], None]) -> None:

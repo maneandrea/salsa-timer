@@ -31,6 +31,13 @@ def main() -> None:
         default=None,
         help="Show entries since date (YYYY-MM-DD), default: today",
     )
+    log_parser.add_argument(
+        "--detailed",
+        "-d",
+        action="store_true",
+        default=False,
+        help="Print individual events below each session row",
+    )
 
     _status_parser = subparsers.add_parser("status", help="Show current session status")
     _pause_parser = subparsers.add_parser("pause", help="Pause the current task without ending it")
@@ -48,7 +55,7 @@ def main() -> None:
     elif args.command == "stop":
         salsa_stop()
     elif args.command == "log":
-        salsa_log(args.since)
+        salsa_log(args.since, detailed=args.detailed)
     elif args.command == "status":
         salsa_status()
     elif args.command == "clear":
