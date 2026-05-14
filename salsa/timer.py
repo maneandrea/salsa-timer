@@ -9,6 +9,8 @@ from salsa.utils import (
     get_last_entry,
     get_today_path,
     is_stopped,
+    load_data,
+    write_data,
 )
 
 
@@ -58,3 +60,14 @@ def salsa_stop(override_time: time | None) -> None:
 
 def salsa_resume(override_time: time | None) -> None:
     _transition([Event.PAUSE], Event.RESUME, "resume", override_time)
+
+
+def salsa_undo() -> None:
+    path = get_today_path()
+    data = load_data(path)
+    if not data:
+        print("Nothing to undo.")
+        return
+    removed = data[-1]
+    write_data(path, data[:-1])
+    print(f"Undone: {removed['event'].value} {removed['description']} ({removed['task_id'].hex[:6]}…)")

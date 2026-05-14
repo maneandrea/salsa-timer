@@ -84,23 +84,31 @@ def is_stopped() -> bool:
     return True
 
 
+def _serialize_entries(data: list[LogEntry]) -> list[str]:
+    return [
+        json.dumps(
+            {
+                "task_id": entry["task_id"].hex,
+                "event": entry["event"].value,
+                "datetime": entry["datetime"].isoformat(),
+                "description": entry["description"],
+            },
+            indent=None,
+            separators=(",", ":"),
+        )
+        for entry in data
+    ]
+
+
+def write_data(path: Path, data: list[LogEntry]) -> None:
+    with open(path, "w") as f:
+        for line in _serialize_entries(data):
+            f.write(line + "\n")
+
+
 def append_data(path: Path, data: list[LogEntry]) -> None:
     with open(path, "a+") as f:
-        # Convert datetime objects to isoformat for JSON serialization
-        lines = [
-            json.dumps(
-                {
-                    "task_id": entry["task_id"].hex,
-                    "event": entry["event"].value,
-                    "datetime": entry["datetime"].isoformat(),
-                    "description": entry["description"],
-                },
-                indent=None,
-                separators=(",", ":"),
-            )
-            for entry in data
-        ]
-        for line in lines:
+        for line in _serialize_entries(data):
             f.write(line + "\n")
 
 

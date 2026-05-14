@@ -12,7 +12,7 @@ Usage:
 import argparse
 
 from salsa.query import salsa_clear, salsa_log, salsa_show, salsa_status
-from salsa.timer import salsa_pause, salsa_resume, salsa_start, salsa_stop
+from salsa.timer import salsa_pause, salsa_resume, salsa_start, salsa_stop, salsa_undo
 from salsa.utils import valid_time
 
 
@@ -55,6 +55,8 @@ def main() -> None:
     clear_parser = subparsers.add_parser("clear", help="Cleanup data")
     clear_parser.add_argument("scope", help="What to eliminate", choices=["all", "today"])
 
+    _undo_parser = subparsers.add_parser("undo", help="Delete the last entry")
+
     args = parser.parse_args()
 
     if args.command == "start":
@@ -74,6 +76,8 @@ def main() -> None:
         salsa_resume(args.time)
     elif args.command == "show":
         salsa_show()
+    elif args.command == "undo":
+        salsa_undo()
     else:
         salsa_show()
 
