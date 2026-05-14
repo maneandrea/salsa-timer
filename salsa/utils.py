@@ -1,6 +1,7 @@
+import argparse
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from pathlib import Path
 from typing import Iterator
 from uuid import UUID
@@ -126,3 +127,19 @@ def format_td_num(td):
     hours, remainder = divmod(total_sec, 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"{hours:02}:{minutes:02}:{seconds:02}"
+
+
+def valid_time(time_str):
+    """Parses a time string in HH:MM format."""
+    try:
+        return time.strptime(time_str, "%H:%M")
+    except ValueError:
+        msg = f"Not a valid time: '{time_str}'. Expected HH:MM."
+        raise argparse.ArgumentTypeError(msg)
+
+
+def coalesce_time(override_time: time | None) -> datetime:
+    now = datetime.now()
+    if override_time is None:
+        return now
+    return datetime.combine(now.date(), override_time)
