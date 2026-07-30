@@ -6,24 +6,33 @@ from pathlib import Path
 from typing import Iterator
 from uuid import UUID
 
-from salsa.types import Event, LogEntry
+from salsa.types import EntryEvent, Event, LogEntry, parse_event
 
 BASE_DIR = os.path.expanduser("~/.local/share/salsa")
 
 
 def get_today_path() -> Path:
+    """Returns today's log file path, creating the base directory if needed."""
     today = datetime.now().strftime("%Y-%m-%d")
     os.makedirs(BASE_DIR, exist_ok=True)
     return Path(BASE_DIR) / f"{today}.jsonl"
 
 
 def get_all_paths() -> list[Path]:
+    """Returns the paths of all log files in the base directory."""
     os.makedirs(BASE_DIR, exist_ok=True)
     names = [f for f in os.listdir(BASE_DIR) if f.endswith(".jsonl")]
     return [Path(BASE_DIR) / name for name in names]
 
 
 def get_log_iter() -> Iterator[LogEntry]:
+    """Iterates over all log entries, most recent day and entry first.
+
+    Files that fail to load are skipped silently.
+
+    Yields:
+        LogEntry: entries in reverse chronological order.
+    """
     if not os.path.exists(BASE_DIR):
         return
     files = sorted([f for f in os.listdir(BASE_DIR) if f.endswith(".jsonl")], reverse=True)
@@ -37,6 +46,15 @@ def get_log_iter() -> Iterator[LogEntry]:
 
 
 def load_data(path: Path) -> list[LogEntry]:
+    """Loads log entries from a JSONL file.
+
+    Args:
+        path (Path): path to the JSONL log file.
+
+    Returns:
+        list[LogEntry]: parsed entries in file order, or an empty list if
+            the file doesn't exist.
+    """
     if not os.path.exists(path):
         return []
     with open(path, "r") as f:
@@ -45,10 +63,9 @@ def load_data(path: Path) -> list[LogEntry]:
             raw = json.loads(line)
             entries.append(
                 LogEntry(
-                    task_id=UUID(raw["task_id"]),
-                    description=raw["description"],
+                    entry_id=UUID(raw["entry_id"]),
                     datetime=datetime.fromisoformat(raw["datetime"]),
-                    event=Event(raw["event"]),
+                    event=parse_event(raw["event"]),
                 )
             )
 
@@ -56,42 +73,67 @@ def load_data(path: Path) -> list[LogEntry]:
 
 
 def get_last_entry(expected_states: list[Event]) -> None | LogEntry:
+    """Returns today's last log entry if it matches one of the expected states.
+
+    Args:
+        expected_states (list[Event]): events to match against the last entry.
+
+    Returns:
+        None | LogEntry: the last entry, or None if there isn't one or it
+            doesn't match.
+    """
     path = get_today_path()
     data = load_data(path)
-    if data and data[-1]["event"] in expected_states:
+    if data and data[-1].event.matches(expected_states):
         return data[-1]
     return None
 
 
-def get_group(task_id: UUID) -> list[LogEntry]:
+def get_group(entry_id: UUID) -> list[LogEntry]:
+    """Returns all entries sharing entry_id within the day they first appear.
+
+    Args:
+        entry_id (UUID): identifier of the entry group to collect.
+
+    Returns:
+        list[LogEntry]: entries in the group, in log order.
+    """
     entries = []
     group_day = None
     for entry in get_log_iter():
-        if group_day and entry["datetime"].date() != group_day:
+        if group_day and entry.datetime.date() != group_day:
             break
-        if entry["task_id"] == task_id:
-            group_day = entry["datetime"].date()
+        if entry.entry_id == entry_id:
+            group_day = entry.datetime.date()
             entries.append(entry)
 
     return entries
 
 
 def is_stopped() -> bool:
+    """Returns whether today's last event is STOP (True if there are no entries yet)."""
     path = get_today_path()
     data = load_data(path)
-    if data and data[-1]["event"] != Event.STOP:
+    if data and data[-1].event != EntryEvent.STOP:
         return False
     return True
 
 
 def _serialize_entries(data: list[LogEntry]) -> list[str]:
+    """Serializes log entries to compact JSON lines.
+
+    Args:
+        data (list[LogEntry]): entries to serialize.
+
+    Returns:
+        list[str]: one JSON string per entry.
+    """
     return [
         json.dumps(
             {
-                "task_id": entry["task_id"].hex,
-                "event": entry["event"].value,
-                "datetime": entry["datetime"].isoformat(),
-                "description": entry["description"],
+                "entry_id": entry.entry_id.hex,
+                "event": entry.event.serialize(),
+                "datetime": entry.datetime.isoformat(),
             },
             indent=None,
             separators=(",", ":"),
@@ -101,18 +143,31 @@ def _serialize_entries(data: list[LogEntry]) -> list[str]:
 
 
 def write_data(path: Path, data: list[LogEntry]) -> None:
+    """Overwrites path with the serialized entries."""
     with open(path, "w") as f:
         for line in _serialize_entries(data):
             f.write(line + "\n")
 
 
 def append_data(path: Path, data: list[LogEntry]) -> None:
+    """Appends the serialized entries to path."""
     with open(path, "a+") as f:
         for line in _serialize_entries(data):
             f.write(line + "\n")
 
 
 def format_td(delta: timedelta) -> str:
+    """Formats a timedelta as a human-readable duration, e.g. "1 hr 2 min 3 sec".
+
+    Zero-valued larger units (hours, then minutes) are omitted; seconds are
+    always shown if nothing else is.
+
+    Args:
+        delta (timedelta): duration to format.
+
+    Returns:
+        str: human-readable duration.
+    """
     total_seconds = int(delta.total_seconds())
 
     hours, remainder = divmod(total_seconds, 3600)
@@ -130,14 +185,15 @@ def format_td(delta: timedelta) -> str:
     return " ".join(parts)
 
 
-def format_td_num(td):
+def format_td_num(td: timedelta) -> str:
+    """Formats a timedelta as HH:MM:SS."""
     total_sec = int(td.total_seconds())
     hours, remainder = divmod(total_sec, 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"{hours:02}:{minutes:02}:{seconds:02}"
 
 
-def valid_time(time_str):
+def valid_time(time_str: str) -> time:
     """Parses a time string in HH:MM format."""
     try:
         return time.strptime(time_str, "%H:%M")
@@ -147,6 +203,7 @@ def valid_time(time_str):
 
 
 def coalesce_time(override_time: time | None) -> datetime:
+    """Returns override_time combined with today's date, or now if override_time is None."""
     now = datetime.now()
     if override_time is None:
         return now
