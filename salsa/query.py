@@ -52,18 +52,20 @@ def _compute_session(group: list[LogEntry]) -> SessionEntry | None:
             if e.event in (EntryEvent.START, EntryEvent.RESUME):
                 active_start = e.datetime
                 active_task_start = e.datetime
-            elif active_start:
-                accumulator += e.datetime - active_start
+            else:
+                if active_start:
+                    accumulator += e.datetime - active_start
                 if active_task_start:
                     task_accumulator += e.datetime - active_task_start
                 active_start = None
                 active_task_start = None
-            else:
-                continue
         else:
             if active_task_start:
                 task_accumulator += e.datetime - active_task_start
                 active_task_start = e.datetime
+            else:
+                print("error: no active task to save")
+                continue
             tasks.append(SessionTask(duration=task_accumulator, end=e.datetime, task=e.event))
             task_accumulator = timedelta(0)
 
@@ -71,7 +73,7 @@ def _compute_session(group: list[LogEntry]) -> SessionEntry | None:
         accumulator += datetime.now() - active_start
     if active_task_start:
         task_accumulator += datetime.now() - active_task_start
-        tasks.append(SessionTask(duration=task_accumulator, end=None, task=TaskEvent(description="", deliverables={})))
+    tasks.append(SessionTask(duration=task_accumulator, end=None, task=TaskEvent(description="", deliverables={})))
 
     if start and entry_id:
         return SessionEntry(
@@ -143,7 +145,7 @@ def salsa_log(since: str | None = None, detailed: bool = False) -> None:
         for i, sess_task in enumerate(sess.tasks):
             tree = "└─" if i == len(sess.tasks) - 1 else "├─"
             task_time_str = (
-                f"{tree} Task {i + 1:d} ─ {sess_task.end.strftime('%H:%M:%S') if sess_task.end else 'running…'}"
+                f"{tree} Task {i + 1:d} ─ {sess_task.end.strftime('%H:%M:%S') if sess_task.end else 'open…'}"
             )
             task_dur_str = format_td_num(sess_task.duration)
             display = sess_task.task.display()
@@ -243,6 +245,7 @@ def salsa_today() -> None:
     if not session:
         return
 
+    sentences = []
     n_tasks = len(session.tasks)
     plural = "s" if n_tasks > 1 else ""
     finished_tasks = [t.duration for t in session.tasks if t.end]
@@ -254,3 +257,6 @@ def salsa_today() -> None:
             continue
         duration = format_td_num(sess_task.duration)
         print(f" * {duration} — {sess_task.task.display()}")
+        sentences.append(sess_task.task.description.strip(" .") + ".")
+    print("—" * len(total_line))
+    print(" ".join(sentences))

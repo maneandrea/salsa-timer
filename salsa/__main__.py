@@ -10,6 +10,7 @@ Usage:
 """
 
 import argparse
+from importlib.metadata import version as _pkg_version
 
 from salsa.query import salsa_clear, salsa_log, salsa_show, salsa_status, salsa_today
 from salsa.timer import salsa_pause, salsa_resume, salsa_start, salsa_stop, salsa_task, salsa_undo
@@ -18,6 +19,7 @@ from salsa.utils import valid_time
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Salsa: Simple timesheet CLI")
+    parser.add_argument("-v", "--version", action="store_true", help="display the current version")
     subparsers = parser.add_subparsers(dest="command")
 
     start_parser = subparsers.add_parser("start", help="Start a new timesheet entry")
@@ -78,6 +80,10 @@ def main() -> None:
     _today_parser = subparsers.add_parser("today", help="Get a string summarizing the last log entry")
 
     args = parser.parse_args()
+
+    if args.version:
+        print("salsa", _pkg_version("salsa"))
+        return
 
     if args.command == "start":
         salsa_start(args.time)
