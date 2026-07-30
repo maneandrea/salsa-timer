@@ -2,11 +2,18 @@
 Salsa CLI: Simple timesheet logger
 
 Usage:
-  salsa start   # Start logging time
-  salsa stop    # Stop logging
-  salsa clear   # Clean up files
-  salsa log     # Browse previous entries
-  salsa status  # Check the current status
+  salsa start          # Start a new timesheet entry
+  salsa task <desc>    # Register the completion of a task
+  salsa pause          # Pause the current task without ending it
+  salsa resume         # Resume a paused task
+  salsa stop <desc>    # Register a final task and stop the entry
+  salsa status         # Check the current status
+  salsa show           # Like status, but keeps updating while running
+  salsa log            # Browse previous entries
+  salsa today          # Summarize today's tasks and their durations
+  salsa undo           # Delete the last log entry
+  salsa clear <scope>  # Clean up files ("all" or "today")
+  salsa --version      # Show the installed version
 """
 
 import argparse
@@ -76,6 +83,12 @@ def main() -> None:
         metavar=("KEY", "VALUE"),
         help="Optional deliverable as evidence of the task, passed by key and value. May be passed multiple times",
     )
+    task_parser.add_argument(
+        "-p",
+        "--pause",
+        action="store_true",
+        help="Pause immediately after closing this task (same as calling salsa pause just after)",
+    )
 
     _today_parser = subparsers.add_parser("today", help="Get a string summarizing the last log entry")
 
@@ -104,7 +117,7 @@ def main() -> None:
     elif args.command == "undo":
         salsa_undo()
     elif args.command == "task":
-        salsa_task(args.time, args.description, deliverables=dict(args.deliverable or []))
+        salsa_task(args.time, args.description, deliverables=dict(args.deliverable or []), pause=args.pause)
     elif args.command == "today":
         salsa_today()
     else:

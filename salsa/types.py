@@ -148,7 +148,14 @@ class LogEntry:
             return self.event.display()
 
     def sort_key(self) -> tuple[datetime, int]:
-        return (self.datetime, 1 if self.event == EntryEvent.STOP else 0)
+        if self.event == EntryEvent.STOP:
+            weight = 2
+        elif self.event == EntryEvent.PAUSE:
+            weight = 1
+        else:
+            weight = 0
+
+        return (self.datetime, weight)
 
 
 @dataclass

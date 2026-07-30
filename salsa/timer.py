@@ -92,7 +92,10 @@ def salsa_undo() -> None:
     print(f"Undone: {labels}")
 
 
-def salsa_task(override_time: time | None, description: str, deliverables: dict[str, str]) -> None:
+def salsa_task(override_time: time | None, description: str, deliverables: dict[str, str], pause: bool = False) -> None:
     """Logs a new task under the running session."""
     event = TaskEvent(description=description, deliverables=deliverables)
-    _transition([EntryEvent.START, EntryEvent.RESUME, TaskEvent.dummy()], event, coalesce_time(override_time))
+    when = coalesce_time(override_time)
+    _transition([EntryEvent.START, EntryEvent.RESUME, TaskEvent.dummy()], event, when)
+    if pause:
+        _transition([TaskEvent.dummy()], EntryEvent.PAUSE, when)
