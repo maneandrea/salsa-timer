@@ -84,7 +84,8 @@ class TaskEvent:
     def display(self) -> str:
         """Render this task event for display to the user."""
         if self.deliverables:
-            return f"{self.description} [deliverables: {', '.join(self.deliverables.keys())}]"
+            deliverables_str = [f"{key}: {val}" for key, val in self.deliverables.items()]
+            return f"{self.description} [deliverables => {', '.join(deliverables_str)}]"
         else:
             return self.description
 
