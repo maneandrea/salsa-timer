@@ -73,7 +73,8 @@ def _compute_session(group: list[LogEntry]) -> SessionEntry | None:
         accumulator += datetime.now() - active_start
     if active_task_start:
         task_accumulator += datetime.now() - active_task_start
-    tasks.append(SessionTask(duration=task_accumulator, end=None, task=TaskEvent(description="", deliverables={})))
+    if end is None:
+        tasks.append(SessionTask(duration=task_accumulator, end=None, task=TaskEvent(description="", deliverables={})))
 
     if start and entry_id:
         return SessionEntry(
