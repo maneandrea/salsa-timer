@@ -30,12 +30,13 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="command")
 
     start_parser = subparsers.add_parser("start", help="Start a new timesheet entry")
-    start_parser.add_argument("--time", "-t", help="Use a different time than now (HH:MM)", type=valid_time)
+    start_parser.add_argument("-t", "--time", help="Use a different time than now (HH:MM)", type=valid_time)
 
     stop_parser = subparsers.add_parser("stop", help="Stop the current timesheet entry")
     stop_parser.add_argument("description", help="What did you complete?")
-    stop_parser.add_argument("--time", "-t", help="Use a different time than now (HH:MM)", type=valid_time)
+    stop_parser.add_argument("-t", "--time", help="Use a different time than now (HH:MM)", type=valid_time)
     stop_parser.add_argument(
+        "-d",
         "--deliverable",
         nargs=2,
         action="append",
@@ -51,8 +52,8 @@ def main() -> None:
         help="Show entries since date (YYYY-MM-DD), default: today",
     )
     log_parser.add_argument(
-        "--detailed",
         "-d",
+        "--detailed",
         action="store_true",
         default=False,
         help="Print individual events below each session row",
@@ -61,10 +62,10 @@ def main() -> None:
     _status_parser = subparsers.add_parser("status", help="Show current session status")
 
     pause_parser = subparsers.add_parser("pause", help="Pause the current task without ending it")
-    pause_parser.add_argument("--time", "-t", help="Use a different time than now (HH:MM)", type=valid_time)
+    pause_parser.add_argument("-t", "--time", help="Use a different time than now (HH:MM)", type=valid_time)
 
     resume_parser = subparsers.add_parser("resume", help="Resume a paused task")
-    resume_parser.add_argument("--time", "-t", help="Use a different time than now (HH:MM)", type=valid_time)
+    resume_parser.add_argument("-t", "--time", help="Use a different time than now (HH:MM)", type=valid_time)
 
     _show_parser = subparsers.add_parser("show", help="Shows the status and continuously updates if running")
 
@@ -75,8 +76,9 @@ def main() -> None:
 
     task_parser = subparsers.add_parser("task", help="Register the completion of a task")
     task_parser.add_argument("description", help="What did you complete?")
-    task_parser.add_argument("--time", "-t", help="Use a different time than now (HH:MM)", type=valid_time)
+    task_parser.add_argument("-t", "--time", help="Use a different time than now (HH:MM)", type=valid_time)
     task_parser.add_argument(
+        "-d",
         "--deliverable",
         nargs=2,
         action="append",
