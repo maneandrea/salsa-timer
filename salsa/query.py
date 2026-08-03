@@ -6,9 +6,12 @@ from time import sleep
 from typing import Literal
 from uuid import UUID
 
+import pyperclip
+
 from salsa.types import EntryEvent, LogEntry, SessionEntry, SessionTask, TaskEvent
 from salsa.utils import (
     format_td,
+    format_td_approx,
     format_td_num,
     get_all_paths,
     get_group,
@@ -247,6 +250,7 @@ def salsa_today() -> None:
         return
 
     sentences = []
+    rows = []
     n_tasks = len(session.tasks)
     plural = "s" if n_tasks > 1 else ""
     finished_tasks = [t.duration for t in session.tasks if t.end]
@@ -256,8 +260,11 @@ def salsa_today() -> None:
     for sess_task in session.tasks:
         if sess_task.end is None:
             continue
-        duration = format_td_num(sess_task.duration)
-        print(f" * {duration} — {sess_task.task.display()}")
+        duration = format_td_approx(sess_task.duration)
+        deliverable_str = ", ".join([f"{k}: {v}" for k, v in sess_task.task.deliverables.items()])
+        rows.append((sess_task.task.description, datetime.today().strftime("%d/%m/%Y"), duration, deliverable_str))
         sentences.append(sess_task.task.description.strip(" .") + ".")
-    print("—" * len(total_line))
     print(" ".join(sentences))
+    print("—" * len(total_line))
+    pyperclip.copy("\n".join(["\t".join(cols) for cols in rows]))
+    print("Content copied to clipboard ✓")

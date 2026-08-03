@@ -193,6 +193,14 @@ def format_td_num(td: timedelta) -> str:
     return f"{hours:02}:{minutes:02}:{seconds:02}"
 
 
+def format_td_approx(td: timedelta) -> str:
+    """Formats a timedelta as HH:MM:SS rounding to the closest minute."""
+    total_sec = int(td.total_seconds())
+    hours, remainder = divmod(total_sec, 3600)
+    minutes, _ = divmod(remainder, 60)
+    return f"{hours:02}:{minutes:02}"
+
+
 def valid_time(time_str: str) -> time:
     """Parses a time string in HH:MM format."""
     try:
