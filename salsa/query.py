@@ -256,7 +256,7 @@ def salsa_today(override_date: date | None) -> None:
 
     sentences = []
     rows = []
-    n_tasks = len(session.tasks)
+    n_tasks = len([t for t in session.tasks if t.end is not None])
     plural = "s" if n_tasks > 1 else ""
     finished_tasks = [t.duration for t in session.tasks if t.end]
     total_line = f"Completed {n_tasks} task{plural}. Total: {format_td(sum(finished_tasks, timedelta(0)))}"
