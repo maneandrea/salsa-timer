@@ -1,7 +1,8 @@
 import argparse
 import json
 import os
-from datetime import datetime, time, timedelta
+import re
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from typing import Iterator
 from uuid import UUID
@@ -11,9 +12,9 @@ from salsa.types import EntryEvent, Event, LogEntry, parse_event
 BASE_DIR = os.path.expanduser("~/.local/share/salsa")
 
 
-def get_today_path() -> Path:
-    """Returns today's log file path, creating the base directory if needed."""
-    today = datetime.now().strftime("%Y-%m-%d")
+def get_today_path(override_date: date | None = None) -> Path:
+    """Returns today's (or the passed date's) log file path, creating the base directory if needed."""
+    today = datetime.now().strftime("%Y-%m-%d") if override_date is None else override_date
     os.makedirs(BASE_DIR, exist_ok=True)
     return Path(BASE_DIR) / f"{today}.jsonl"
 
@@ -72,17 +73,18 @@ def load_data(path: Path) -> list[LogEntry]:
         return entries
 
 
-def get_last_entry(expected_states: list[Event]) -> None | LogEntry:
+def get_last_entry(expected_states: list[Event], override_date: date | None = None) -> None | LogEntry:
     """Returns today's last log entry if it matches one of the expected states.
 
     Args:
         expected_states (list[Event]): events to match against the last entry.
+        override_date (date | None): point to a date other than today
 
     Returns:
         None | LogEntry: the last entry, or None if there isn't one or it
             doesn't match.
     """
-    path = get_today_path()
+    path = get_today_path(override_date)
     data = load_data(path)
     if data and data[-1].event.matches(expected_states):
         return data[-1]
@@ -207,6 +209,23 @@ def valid_time(time_str: str) -> time:
         return time.strptime(time_str, "%H:%M")
     except ValueError:
         msg = f"Not a valid time: '{time_str}'. Expected HH:MM."
+        raise argparse.ArgumentTypeError(msg)
+
+
+def valid_date(date_str: str) -> date:
+    """Parses a date string in YYYY-MM-DD format or words like 'yesterday' or '3 days ago'."""
+    if date_str == "yesterday":
+        dt = datetime.today() - timedelta(days=1)
+        return dt.date()
+    elif date_str == "today":
+        return datetime.today().date()
+    elif m := re.match(r"(\d+) days ago", date_str):
+        dt = datetime.today() - timedelta(days=int(m.group(1)))
+        return dt.date()
+    try:
+        return date.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        msg = f"Not a valid date: '{date_str}'. Expected YYYY-MM-DD."
         raise argparse.ArgumentTypeError(msg)
 
 

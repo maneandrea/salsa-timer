@@ -21,7 +21,7 @@ from importlib.metadata import version as _pkg_version
 
 from salsa.query import salsa_clear, salsa_log, salsa_show, salsa_status, salsa_today
 from salsa.timer import salsa_pause, salsa_resume, salsa_start, salsa_stop, salsa_task, salsa_undo
-from salsa.utils import valid_time
+from salsa.utils import valid_date, valid_time
 
 
 def main() -> None:
@@ -92,7 +92,13 @@ def main() -> None:
         help="Pause immediately after closing this task (same as calling salsa pause just after)",
     )
 
-    _today_parser = subparsers.add_parser("today", help="Get a string summarizing the last log entry")
+    today_parser = subparsers.add_parser("today", help="Get a string summarizing the last log entry")
+    today_parser.add_argument(
+        "-d",
+        "--date",
+        help="Use a date other than today (YYYY-MM-DD or words like 'yesterday' or '3 days ago')",
+        type=valid_date,
+    )
 
     args = parser.parse_args()
 
@@ -121,7 +127,7 @@ def main() -> None:
     elif args.command == "task":
         salsa_task(args.time, args.description, deliverables=dict(args.deliverable or []), pause=args.pause)
     elif args.command == "today":
-        salsa_today()
+        salsa_today(args.date)
     else:
         salsa_show()
 

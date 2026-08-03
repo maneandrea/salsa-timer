@@ -237,11 +237,16 @@ def salsa_clear(scope: Literal["all", "today"]):
         os.remove(get_today_path())
 
 
-def salsa_today() -> None:
+def salsa_today(override_date: date | None) -> None:
     """Prints a description of every task done today, along with its duration."""
-    last = get_last_entry([EntryEvent.START, EntryEvent.STOP, EntryEvent.PAUSE, EntryEvent.RESUME, TaskEvent.dummy()])
+    last = get_last_entry(
+        [EntryEvent.START, EntryEvent.STOP, EntryEvent.PAUSE, EntryEvent.RESUME, TaskEvent.dummy()], override_date
+    )
     if not last:
-        print("No entries today.")
+        if override_date is not None:
+            print(f"No entries on {override_date.strftime('%Y-%m-%d')}")
+        else:
+            print("No entries today.")
         return
 
     group = get_group(last.entry_id)
