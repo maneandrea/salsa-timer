@@ -11,6 +11,7 @@ Usage:
   salsa show           # Like status, but keeps updating while running
   salsa log            # Browse previous entries
   salsa today          # Summarize today's tasks and their durations
+  salsa edit           # Edit the raw JSONL file with a text editor of choice
   salsa undo           # Delete the last log entry
   salsa clear <scope>  # Clean up files ("all" or "today")
   salsa --version      # Show the installed version
@@ -20,7 +21,7 @@ import argparse
 from importlib.metadata import version as _pkg_version
 
 from salsa.query import salsa_clear, salsa_log, salsa_show, salsa_status, salsa_today
-from salsa.timer import salsa_pause, salsa_resume, salsa_start, salsa_stop, salsa_task, salsa_undo
+from salsa.timer import salsa_edit, salsa_pause, salsa_resume, salsa_start, salsa_stop, salsa_task, salsa_undo
 from salsa.utils import valid_date, valid_time
 
 
@@ -100,6 +101,17 @@ def main() -> None:
         type=valid_date,
     )
 
+    edit_parser = subparsers.add_parser("edit", help="Edit a specific entry by opening the raw JSONL file")
+    edit_parser.add_argument(
+        "-d",
+        "--date",
+        help="Use a date other than today (YYYY-MM-DD or words like 'yesterday' or '3 days ago')",
+        type=valid_date,
+    )
+    edit_parser.add_argument(
+        "-e", "--editor", help="Use this text editor to edit the entry (default: vim)", default="vim"
+    )
+
     args = parser.parse_args()
 
     if args.version:
@@ -128,6 +140,8 @@ def main() -> None:
         salsa_task(args.time, args.description, deliverables=dict(args.deliverable or []), pause=args.pause)
     elif args.command == "today":
         salsa_today(args.date)
+    elif args.command == "edit":
+        salsa_edit(args.date, args.editor)
     else:
         salsa_show()
 

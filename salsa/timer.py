@@ -1,4 +1,7 @@
-from datetime import datetime, time
+import shlex
+import subprocess
+from datetime import date, datetime, time
+from json import JSONDecodeError
 from uuid import uuid4
 
 from salsa.types import EntryEvent, Event, LogEntry, TaskEvent
@@ -99,3 +102,30 @@ def salsa_task(override_time: time | None, description: str, deliverables: dict[
     _transition([EntryEvent.START, EntryEvent.RESUME, TaskEvent.dummy()], event, when)
     if pause:
         _transition([TaskEvent.dummy()], EntryEvent.PAUSE, when)
+
+
+def salsa_edit(override_date: date | None, editor: str) -> None:
+    """Launches the given editor to edit a raw entry"""
+    path = get_today_path(override_date)
+    cmd = shlex.split(editor)
+    cmd.append(str(path))
+
+    with open(path, "r") as bk:
+        backup = bk.read()
+
+    try:
+        subprocess.run(cmd, check=True)
+        _ = load_data(path)
+        print(f"Successfully edited: {path}")
+    except FileNotFoundError:
+        print(f"Error: The editor '{cmd[0]}' could not be found.")
+    except subprocess.CalledProcessError as e:
+        print(f"Editor exited with an error code: {e.returncode}")
+    except (JSONDecodeError, KeyError, ValueError) as e:
+        if isinstance(e, KeyError):
+            reason = "key not found "
+        else:
+            reason = ""
+        print(f"Edited file was left in a corrupted state: {reason}{e}. Restoring backup.")
+        with open(path, "w+") as res:
+            res.write(backup)
