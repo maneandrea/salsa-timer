@@ -199,7 +199,9 @@ def format_td_approx(td: timedelta) -> str:
     """Formats a timedelta as HH:MM:SS rounding to the closest minute."""
     total_sec = int(td.total_seconds())
     hours, remainder = divmod(total_sec, 3600)
-    minutes, _ = divmod(remainder, 60)
+    minutes, secs = divmod(remainder, 60)
+    if secs >= 30:
+        minutes += 1
     return f"{hours:02}:{minutes:02}"
 
 
