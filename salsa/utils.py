@@ -11,10 +11,21 @@ from salsa.types import EntryEvent, Event, LogEntry, parse_event
 
 BASE_DIR = os.path.expanduser("~/.local/share/salsa")
 
+WEEKDAYS = {
+    "monday": 0,
+    "tuesday": 1,
+    "wednesday": 2,
+    "thursday": 3,
+    "friday": 4,
+    "saturday": 5,
+    "sunday": 6,
+}
+
 
 def get_today_path(override_date: date | None = None) -> Path:
     """Returns today's (or the passed date's) log file path, creating the base directory if needed."""
-    today = datetime.now().strftime("%Y-%m-%d") if override_date is None else override_date
+    today = datetime.now() if override_date is None else override_date
+    today = today.strftime("%Y-%m-%d")
     os.makedirs(BASE_DIR, exist_ok=True)
     return Path(BASE_DIR) / f"{today}.jsonl"
 
@@ -24,6 +35,23 @@ def get_all_paths() -> list[Path]:
     os.makedirs(BASE_DIR, exist_ok=True)
     names = [f for f in os.listdir(BASE_DIR) if f.endswith(".jsonl")]
     return [Path(BASE_DIR) / name for name in names]
+
+
+def get_log(day: date) -> list[LogEntry] | None:
+    """Gets the log entries for a specific day.
+
+    Args:
+        day (date): the date of the entries.
+
+    Returns:
+        list[LogEntry]: the day's entries, empty if the day has no log file,
+            or None if the log file exists but failed to load.
+    """
+    path = get_today_path(day)
+    try:
+        return load_data(path)
+    except Exception:
+        return None
 
 
 def get_log_iter() -> Iterator[LogEntry]:
@@ -214,6 +242,49 @@ def valid_time(time_str: str) -> time:
         raise argparse.ArgumentTypeError(msg)
 
 
+def _date_this(period: str) -> date:
+    """Gives the start of the current period.
+
+    Args:
+        period (str): either "month" or "week".
+
+    Returns:
+        date: first day of the current month, or Monday of the current week.
+
+    Raises:
+        argparse.ArgumentTypeError: if period is not "month" or "week".
+    """
+    today = datetime.today()
+    if period == "month":
+        return today.replace(day=1).date()
+    elif period == "week":
+        return (today - timedelta(days=today.weekday())).date()
+    else:
+        raise argparse.ArgumentTypeError(f"not a valid 'this' period: {period}")
+
+
+def _date_last(period: str) -> date:
+    """Gives the start of the previous period.
+
+    Args:
+        period (str): either "month" or "week".
+
+    Returns:
+        date: first day of the previous month, or Monday of the previous week.
+
+    Raises:
+        argparse.ArgumentTypeError: if period is not "month" or "week".
+    """
+    today = datetime.today()
+    if period == "month":
+        first_of_this_month = today.replace(day=1)
+        return (first_of_this_month - timedelta(days=1)).replace(day=1).date()
+    elif period == "week":
+        return (today - timedelta(days=today.weekday() + 7)).date()
+    else:
+        raise argparse.ArgumentTypeError(f"not a valid 'last' period: {period}")
+
+
 def valid_date(date_str: str) -> date:
     """Parses a date string in YYYY-MM-DD format or words like 'yesterday' or '3 days ago'."""
     if date_str == "yesterday":
@@ -224,6 +295,16 @@ def valid_date(date_str: str) -> date:
     elif m := re.match(r"(\d+) days ago", date_str):
         dt = datetime.today() - timedelta(days=int(m.group(1)))
         return dt.date()
+    elif m := re.match(r"last (\w+)", date_str):
+        return _date_last(m.group(1))
+    elif m := re.match(r"this (\w+)", date_str):
+        return _date_this(m.group(1))
+    elif date_str in WEEKDAYS.keys():
+        today = datetime.today()
+        diff = WEEKDAYS[date_str] - today.weekday()
+        if diff >= 0:
+            diff -= 7
+        return (today + timedelta(days=diff)).date()
     try:
         return date.strptime(date_str, "%Y-%m-%d")
     except ValueError:

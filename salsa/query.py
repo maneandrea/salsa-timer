@@ -16,6 +16,7 @@ from salsa.utils import (
     get_all_paths,
     get_group,
     get_last_entry,
+    get_log,
     get_log_iter,
     get_today_path,
 )
@@ -92,33 +93,37 @@ def _compute_session(group: list[LogEntry]) -> SessionEntry | None:
     return
 
 
-def salsa_log(since: str | None = None, detailed: bool = False) -> None:
+def salsa_log(since: date | None = None, of: date | None = None, detailed: bool = False) -> None:
     """Print log entries since a given date (YYYY-MM-DD). Defaults to today.
 
     Args:
-        since (str | None): Lower bound date string. Accepts ISO date, "today",
-            "yesterday", "this week", or "this month".
+        since (date | None): Lower bound date.
+        of (date | None): Exact date to show. Mutually exclusive with since.
         detailed (bool): When True, prints individual events below each session row.
     """
-    today = date.today()
 
-    if since is None or since == "today":
-        since_dt = today
-    elif since == "yesterday":
-        since_dt = today - timedelta(days=1)
-    elif since == "this week":
-        since_dt = today - timedelta(days=today.weekday())
-    elif since == "this month":
-        since_dt = today.replace(day=1)
-    else:
-        since_dt = date.fromisoformat(since)
+    limit = date.today()
+    is_since = False
+    if since is not None and of is None:
+        limit = since
+        is_since = True
+    elif since is None and of is not None:
+        limit = of
+    elif since is not None and of is not None:
+        raise ValueError("since and of are mutually exclusive")
 
     grouped: dict[UUID, list[LogEntry]] = defaultdict(list)
-    for e in get_log_iter():
-        if e.datetime.date() >= since_dt:
-            grouped[e.entry_id].append(e)
-        else:
-            break
+    if is_since:
+        for e in get_log_iter():
+            if e.datetime.date() >= limit:
+                grouped[e.entry_id].append(e)
+            else:
+                break
+    else:
+        entries = get_log(limit)
+        if entries is not None:
+            for entry in entries:
+                grouped[entry.entry_id].append(entry)
 
     sessions: list[tuple[SessionEntry, list[LogEntry]]] = []
     for group in grouped.values():
@@ -127,7 +132,10 @@ def salsa_log(since: str | None = None, detailed: bool = False) -> None:
             sessions.append((session, sorted(group, key=LogEntry.sort_key)))
 
     if not sessions:
-        print(f"No entries since {since_dt.isoformat()}.")
+        if since is not None:
+            print(f"No entries since {limit.isoformat()}.")
+        else:
+            print(f"No entries at {limit.isoformat()}.")
         return
 
     ENTRY_W = 7

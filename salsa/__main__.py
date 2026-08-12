@@ -46,11 +46,18 @@ def main() -> None:
     )
 
     log_parser = subparsers.add_parser("log", help="Show log entries")
-    log_parser.add_argument(
+    date_spec = log_parser.add_mutually_exclusive_group()
+    date_spec.add_argument(
         "--since",
-        type=str,
+        type=valid_date,
         default=None,
         help="Show entries since date (YYYY-MM-DD), default: today",
+    )
+    date_spec.add_argument(
+        "--of",
+        type=valid_date,
+        default=None,
+        help="Show entries of date (YYYY-MM-DD), mutually exclusive with --since",
     )
     log_parser.add_argument(
         "-d",
@@ -123,7 +130,7 @@ def main() -> None:
     elif args.command == "stop":
         salsa_stop(args.time, args.description, deliverables=dict(args.deliverable or []))
     elif args.command == "log":
-        salsa_log(args.since, detailed=args.detailed)
+        salsa_log(args.since, args.of, detailed=args.detailed)
     elif args.command == "status":
         salsa_status()
     elif args.command == "clear":
