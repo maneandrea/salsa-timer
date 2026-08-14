@@ -35,6 +35,22 @@ def _dim_row(*cells: str) -> str:
     return "\033[2m" + f" \033[0m{FENCE}\033[2m ".join(cells) + "\033[0m"
 
 
+def _weekday(weekday: int) -> str:
+    """Formats a weekday"""
+    return {0: "Mon", 1: "Tue", 2: "Wed", 3: "Thu", 4: "Fri", 5: "Sat", 6: "Sun"}[weekday]
+
+
+def _duration_color(duration: timedelta) -> tuple[str, str]:
+    """Colors in green entries over 9 hours and in red entries below 7 hours"""
+    hours = duration.total_seconds() / 3600
+    if hours >= 9:
+        return "\033[32m", "\033[0m"
+    elif hours <= 7:
+        return "\033[31m", "\033[0m"
+    else:
+        return "", ""
+
+
 def _compute_session(group: list[LogEntry]) -> SessionEntry | None:
     accumulator = timedelta(0)
     task_accumulator = timedelta(0)
@@ -145,13 +161,25 @@ def salsa_log(since: date | None = None, of: tuple[date, int] | None = None, det
     header = f"{'ENTRY':<{ENTRY_W}} {FENCE} {'TIME':<{TIME_W}} {FENCE} {'DURATION':<{DUR_W}} {FENCE} {'DESCRIPTION':<{MAX_DESC_LEN}}"
     print(header)
     print(_rule(header))
+    current_weekday = None
     for sess, events in sessions:
+        line_weekday = sess.start.weekday()
         start = sess.start.strftime("%Y-%m-%d %H:%M:%S")
         end = sess.end.strftime("%H:%M:%S") if sess.end else ("paused… " if sess.paused() else "running…")
         time_str = f"{start} - {end}"
         duration_str = format_td_num(sess.duration)
+        dur_col_s, dur_col_e = _duration_color(sess.duration)
         task_id_str = f"{sess.entry_id.hex[:6]}…"
-        print(f"{task_id_str:<{ENTRY_W}} {FENCE} {time_str:<{TIME_W}} {FENCE} {duration_str:<{DUR_W}} {FENCE}")
+        if current_weekday != line_weekday:
+            current_weekday = line_weekday
+            first_column = f"\033[1m{_weekday(current_weekday):>{ENTRY_W}}\033[0m"
+            task_id_pending = True
+        else:
+            first_column = f"\033[2m{task_id_str:<{ENTRY_W}}\033[0m"
+            task_id_pending = False
+        print(
+            f"{first_column} {FENCE} {time_str:<{TIME_W}} {FENCE} {dur_col_s}{duration_str:<{DUR_W}}{dur_col_e} {FENCE}"
+        )
 
         blank_entry = " " * ENTRY_W
 
@@ -164,7 +192,12 @@ def salsa_log(since: date | None = None, of: tuple[date, int] | None = None, det
             display = sess_task.task.display()
             if len(display) > MAX_DESC_LEN:
                 display = display[: MAX_DESC_LEN - 1] + "…"
-            print(_dim_row(blank_entry, f"{task_time_str:<{TIME_W}}", f"{task_dur_str:<{DUR_W}}", display))
+            if task_id_pending:
+                first_task_column = f"{task_id_str:<{ENTRY_W}}"
+                task_id_pending = False
+            else:
+                first_task_column = blank_entry
+            print(_dim_row(first_task_column, f"{task_time_str:<{TIME_W}}", f"{task_dur_str:<{DUR_W}}", display))
 
         if detailed:
             label = " events "
