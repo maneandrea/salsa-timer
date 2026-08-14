@@ -1,4 +1,5 @@
 import argparse
+import calendar
 import json
 import os
 import re
@@ -37,8 +38,9 @@ def get_all_paths() -> list[Path]:
     return [Path(BASE_DIR) / name for name in names]
 
 
-def get_log(day: date) -> list[LogEntry] | None:
-    """Gets the log entries for a specific day.
+def get_log_iter_range(day: date, length: int) -> Iterator[LogEntry]:
+    """Gets the log entries for a specific range between day and day + length.
+    Returns entries in reversed order, i.e. from most recent to least recent.
 
     Args:
         day (date): the date of the entries.
@@ -47,11 +49,13 @@ def get_log(day: date) -> list[LogEntry] | None:
         list[LogEntry]: the day's entries, empty if the day has no log file,
             or None if the log file exists but failed to load.
     """
-    path = get_today_path(day)
-    try:
-        return load_data(path)
-    except Exception:
-        return None
+    for d in range(length - 1, -1, -1):
+        path = get_today_path(day + timedelta(days=d))
+        try:
+            data = load_data(path)
+        except Exception:
+            continue
+        yield from reversed(data)
 
 
 def get_log_iter() -> Iterator[LogEntry]:
@@ -310,6 +314,20 @@ def valid_date(date_str: str) -> date:
     except ValueError:
         msg = f"Not a valid date: '{date_str}'. Expected YYYY-MM-DD."
         raise argparse.ArgumentTypeError(msg)
+
+
+def valid_date_and_duration(date_str: str) -> tuple[date, int]:
+    """Parses a date string in YYYY-MM-DD format or words like 'yesterday' or '3 days ago'
+    and also returns its duration in days
+    """
+    date = valid_date(date_str)
+    if "month" in date_str:
+        _, duration = calendar.monthrange(date.year, date.month)
+    elif "week" in date_str:
+        duration = 7
+    else:
+        duration = 1
+    return date, duration
 
 
 def coalesce_time(override_time: time | None) -> datetime:

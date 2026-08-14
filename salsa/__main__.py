@@ -22,7 +22,7 @@ from importlib.metadata import version as _pkg_version
 
 from salsa.query import salsa_clear, salsa_log, salsa_show, salsa_status, salsa_today
 from salsa.timer import salsa_edit, salsa_pause, salsa_resume, salsa_start, salsa_stop, salsa_task, salsa_undo
-from salsa.utils import valid_date, valid_time
+from salsa.utils import valid_date, valid_date_and_duration, valid_time
 
 
 def main() -> None:
@@ -55,7 +55,7 @@ def main() -> None:
     )
     date_spec.add_argument(
         "--of",
-        type=valid_date,
+        type=valid_date_and_duration,
         default=None,
         help="Show entries of date (YYYY-MM-DD), mutually exclusive with --since",
     )

@@ -16,8 +16,8 @@ from salsa.utils import (
     get_all_paths,
     get_group,
     get_last_entry,
-    get_log,
     get_log_iter,
+    get_log_iter_range,
     get_today_path,
 )
 
@@ -93,7 +93,7 @@ def _compute_session(group: list[LogEntry]) -> SessionEntry | None:
     return
 
 
-def salsa_log(since: date | None = None, of: date | None = None, detailed: bool = False) -> None:
+def salsa_log(since: date | None = None, of: tuple[date, int] | None = None, detailed: bool = False) -> None:
     """Print log entries since a given date (YYYY-MM-DD). Defaults to today.
 
     Args:
@@ -102,25 +102,26 @@ def salsa_log(since: date | None = None, of: date | None = None, detailed: bool 
         detailed (bool): When True, prints individual events below each session row.
     """
 
-    limit = date.today()
+    start = date.today()
+    duration = 1
     is_since = False
     if since is not None and of is None:
-        limit = since
+        start = since
         is_since = True
     elif since is None and of is not None:
-        limit = of
+        (start, duration) = of
     elif since is not None and of is not None:
         raise ValueError("since and of are mutually exclusive")
 
     grouped: dict[UUID, list[LogEntry]] = defaultdict(list)
     if is_since:
         for e in get_log_iter():
-            if e.datetime.date() >= limit:
+            if e.datetime.date() >= start:
                 grouped[e.entry_id].append(e)
             else:
                 break
     else:
-        entries = get_log(limit)
+        entries = get_log_iter_range(start, duration)
         if entries is not None:
             for entry in entries:
                 grouped[entry.entry_id].append(entry)
@@ -133,9 +134,9 @@ def salsa_log(since: date | None = None, of: date | None = None, detailed: bool 
 
     if not sessions:
         if since is not None:
-            print(f"No entries since {limit.isoformat()}.")
+            print(f"No entries since {start.isoformat()}.")
         else:
-            print(f"No entries at {limit.isoformat()}.")
+            print(f"No entries at {start.isoformat()}.")
         return
 
     ENTRY_W = 7
