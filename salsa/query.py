@@ -315,3 +315,24 @@ def salsa_today(override_date: date | None) -> None:
     print("—" * len(total_line))
     pyperclip.copy("\n".join(["\t".join(cols) for cols in rows]))
     print("Content copied to clipboard ✓")
+
+
+def salsa_last() -> None:
+    """Prints the latest completed task"""
+    last = get_last_entry([EntryEvent.START, EntryEvent.STOP, EntryEvent.PAUSE, EntryEvent.RESUME, TaskEvent.dummy()])
+    if not last:
+        print("No entries today.")
+        return
+
+    group = get_group(last.entry_id)
+    session = _compute_session(group)
+    finished_tasks = [t for t in session.tasks if t.end] if session is not None else []
+    if not finished_tasks:
+        print("No finished tasks today.")
+        return
+    last_task = max(finished_tasks, key=lambda t: t.end.timestamp() if t.end else 0)
+    print(f"\033[1mDuration     {FENCE}\033[0m", format_td(last_task.duration))
+    print(f"\033[1mDescription  {FENCE}\033[0m", last_task.task.description)
+    print(
+        f"\033[1mDeliverables {FENCE}\033[0m", ", ".join([f"{k}: {d}" for k, d in last_task.task.deliverables.items()])
+    )

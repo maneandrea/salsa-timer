@@ -20,7 +20,7 @@ Usage:
 import argparse
 from importlib.metadata import version as _pkg_version
 
-from salsa.query import salsa_clear, salsa_log, salsa_show, salsa_status, salsa_today
+from salsa.query import salsa_clear, salsa_last, salsa_log, salsa_show, salsa_status, salsa_today
 from salsa.timer import salsa_edit, salsa_pause, salsa_resume, salsa_start, salsa_stop, salsa_task, salsa_undo
 from salsa.utils import valid_date, valid_date_and_duration, valid_time
 
@@ -81,6 +81,8 @@ def main() -> None:
     clear_parser.add_argument("scope", help="What to eliminate", choices=["all", "today"])
 
     _undo_parser = subparsers.add_parser("undo", help="Delete the last entry")
+
+    _last_parser = subparsers.add_parser("last", help="Get information on the last completed task")
 
     task_parser = subparsers.add_parser("task", help="Register the completion of a task")
     task_parser.add_argument("description", help="What did you complete?")
@@ -147,6 +149,8 @@ def main() -> None:
         salsa_task(args.time, args.description, deliverables=dict(args.deliverable or []), pause=args.pause)
     elif args.command == "today":
         salsa_today(args.date)
+    elif args.command == "last":
+        salsa_last()
     elif args.command == "edit":
         salsa_edit(args.date, args.editor)
     else:
