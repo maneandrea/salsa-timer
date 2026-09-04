@@ -215,31 +215,41 @@ def salsa_log(since: date | None = None, of: tuple[date, int] | None = None, det
                 print(_dim_row(blank_entry, f"{ts:<{TIME_W}}", f"{'':<{DUR_W}}", event_label))
 
 
-def _salsa_status(on_active: Callable[[timedelta, str, UUID], None]) -> None:
+def _salsa_status(on_active: Callable[[timedelta, timedelta, UUID], None]) -> None:
     last = get_last_entry([EntryEvent.START, EntryEvent.STOP, EntryEvent.PAUSE, EntryEvent.RESUME, TaskEvent.dummy()])
     if not last:
         print("\033[31m● \033[1mstopped\033[0m (last task: none)")
         return
 
     event = last.event
-    task_id = last.entry_id
-    group = get_group(task_id)
+    entry_id = last.entry_id
+    group = get_group(entry_id)
     session = _compute_session(group)
     description = session.tasks[-1].task.description if session and session.tasks else "none"
     accumulated_td = session.duration if session else timedelta(0)
+    task_td = session.tasks[-1].duration if session and session.tasks else timedelta(0)
     match event:
         case EntryEvent.START | EntryEvent.RESUME | TaskEvent():
             duration = format_td(accumulated_td)
-            task_label = f"{description} " if description else ""
-            print(f"\033[32m● \033[1mrunning\033[0m {task_label}({task_id.hex[:6]}…) | {duration}", end="", flush=True)
+            task_duration = format_td(task_td)
+            print(
+                f"\033[32m● \033[1mrunning\033[0m ({entry_id.hex[:6]}…) {FENCE} \033[1mTotal\033[0m: {duration:<20} "
+                f"{FENCE} \033[1mLast task\033[0m: {task_duration:<20}",
+                end="",
+                flush=True,
+            )
             try:
-                on_active(accumulated_td, description, task_id)
+                on_active(accumulated_td, task_td, entry_id)
             except KeyboardInterrupt:
                 print("")
                 return
         case EntryEvent.PAUSE:
-            accumulated = format_td(accumulated_td)
-            print(f"\033[33m● \033[1mpaused\033[0m {description} ({task_id.hex[:6]}…) | {accumulated}")
+            duration = format_td(accumulated_td)
+            task_duration = format_td(task_td)
+            print(
+                f"\033[33m● \033[1mpaused \033[0m ({entry_id.hex[:6]}…) {FENCE} \033[1mTotal\033[0m: {duration:<20} "
+                f"{FENCE} \033[1mLast task\033[0m: {task_duration:<20}"
+            )
         case _:
             print(f"\033[31m● \033[1mstopped\033[0m (last task: {description})")
 
@@ -250,15 +260,19 @@ def salsa_status() -> None:
 
 def salsa_show() -> None:
 
-    def _go(acc_duration: timedelta, description: str, task_id: UUID) -> None:
+    def _go(acc_duration: timedelta, task_duration: timedelta, entry_id: UUID) -> None:
         reference = datetime.now()
-        task_label = f"{description} " if description else ""
         while True:
             sleep(1)
             duration_td = acc_duration + (datetime.now() - reference)
+            task_duration_td = task_duration + (datetime.now() - reference)
             duration = format_td(duration_td)
+            task_duration_f = format_td(task_duration_td)
             print(
-                f"\r\033[32m● \033[1mrunning\033[0m {task_label}({task_id.hex[:6]}…) | {duration}", end="", flush=True
+                f"\r\033[32m● \033[1mrunning\033[0m ({entry_id.hex[:6]}…) {FENCE} \033[1mTotal\033[0m: {duration:<20} "
+                f"{FENCE} \033[1mLast task\033[0m: {task_duration_f:<20}",
+                end="",
+                flush=True,
             )
 
     _salsa_status(_go)
