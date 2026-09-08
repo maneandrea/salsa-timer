@@ -154,7 +154,7 @@ def main() -> None:
     elif args.command == "edit":
         salsa_edit(args.date, args.editor)
     else:
-        salsa_show()
+        salsa_status()
 
 
 if __name__ == "__main__":
