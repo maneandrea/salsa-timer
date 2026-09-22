@@ -354,7 +354,7 @@ def salsa_last() -> None:
     )
 
 
-def salsa_stats(of: tuple[date, int]) -> None:
+def salsa_stats(of: tuple[date, int], until: date | None = None) -> None:
     """Prints hours worked in a period against the targeted hours, and the gap between them.
 
     The target is 8 hours for every Monday through Friday in the period.
@@ -363,6 +363,9 @@ def salsa_stats(of: tuple[date, int]) -> None:
         of (tuple[date, int]): start date and length in days of the period.
     """
     start, duration = of
+    if until and until > start:
+        duration = (until - start).days + 1
+        print("DURATION", duration)
 
     grouped: dict[UUID, list[LogEntry]] = defaultdict(list)
     for entry in get_log_iter_range(start, duration):

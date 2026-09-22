@@ -126,7 +126,12 @@ def main() -> None:
         "--of",
         type=valid_date_and_duration,
         default=valid_date_and_duration("this month"),
-        help="Show stats of the given period (YYYY-MM-DD) or a phrase like 'last month' or 'this week'",
+        help="Show stats of the given period (a phrase like 'last month' or 'this week')",
+    )
+    stats_parser.add_argument(
+        "--until",
+        type=valid_date,
+        help="Optionally specify the upper bound for the stats if it isn't a simple period like day, week or month",
     )
 
     args = parser.parse_args()
@@ -162,7 +167,7 @@ def main() -> None:
     elif args.command == "edit":
         salsa_edit(args.date, args.editor)
     elif args.command == "stats":
-        salsa_stats(args.of)
+        salsa_stats(args.of, args.until)
     else:
         salsa_status()
 
