@@ -369,14 +369,29 @@ def salsa_stats(of: tuple[date, int]) -> None:
         grouped[entry.entry_id].append(entry)
 
     worked = timedelta(0)
+    worked_not_today = timedelta(0)
     for group in grouped.values():
         session = _compute_session(group)
         if session:
             worked += session.duration
+            if session.start.date() < datetime.today().date():
+                worked_not_today += session.duration
 
-    workdays = sum(1 for d in range(duration) if (start + timedelta(days=d)).weekday() < 5)
+    workdays = 0
+    past = 0
+    futures = 0
+    today = datetime.today().date()
+    for d in range(duration):
+        if (start + timedelta(days=d)).weekday() < 5:
+            workdays += 1
+            if start + timedelta(days=d) >= today:
+                futures += 1
+            else:
+                past += 1
+
     target = timedelta(hours=8 * workdays)
     diff = worked - target
+    diff_not_today = worked_not_today - target
 
     end = start + timedelta(days=duration - 1)
     period_line = "Period  "
@@ -389,5 +404,8 @@ def salsa_stats(of: tuple[date, int]) -> None:
         print(f"\033[1mMissing {FENCE}\033[0m \033[1;31m{format_td(-diff)}\033[0m")
     else:
         print(f"\033[1mExtra   {FENCE}\033[0m \033[1;32m{format_td(diff)}\033[0m")
-    if workdays > 0:
-        print(f"\033[1mAverage {FENCE}\033[0m {worked.total_seconds() / workdays / 3600:.3f} hours / day")
+    if past > 0:
+        print(f"\033[1mAverage {FENCE}\033[0m {worked.total_seconds() / past / 3600:.3f} hours / day")
+
+    if futures > 0 and diff_not_today < timedelta(0):
+        print(f"\033[1mAim to  {FENCE}\033[0m {-diff_not_today.total_seconds() / futures / 3600:.3f} hours / day")
