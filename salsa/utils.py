@@ -22,6 +22,21 @@ WEEKDAYS = {
     "sunday": 6,
 }
 
+MONTHS = {
+    "january": 1,
+    "february": 2,
+    "march": 3,
+    "april": 4,
+    "may": 5,
+    "june": 6,
+    "july": 7,
+    "august": 8,
+    "september": 9,
+    "october": 10,
+    "november": 11,
+    "december": 12,
+}
+
 
 def get_today_path(override_date: date | None = None) -> Path:
     """Returns today's (or the passed date's) log file path, creating the base directory if needed."""
@@ -299,6 +314,10 @@ def valid_date(date_str: str) -> date:
     elif m := re.match(r"(\d+) days ago", date_str):
         dt = datetime.today() - timedelta(days=int(m.group(1)))
         return dt.date()
+    elif m := re.match(r"(\d+) weeks ago", date_str):
+        today = datetime.today()
+        dt = today - timedelta(days=today.weekday()) - timedelta(days=int(m.group(1)) * 7)
+        return dt.date()
     elif m := re.match(r"last (\w+)", date_str):
         return _date_last(m.group(1))
     elif m := re.match(r"this (\w+)", date_str):
@@ -309,6 +328,11 @@ def valid_date(date_str: str) -> date:
         if diff >= 0:
             diff -= 7
         return (today + timedelta(days=diff)).date()
+    elif date_str in MONTHS.keys():
+        today = datetime.today()
+        month = MONTHS[date_str]
+        year = today.year if month < today.month else today.year - 1
+        return date(year, month, 1)
     try:
         return date.strptime(date_str, "%Y-%m-%d")
     except ValueError:
@@ -321,7 +345,7 @@ def valid_date_and_duration(date_str: str) -> tuple[date, int]:
     and also returns its duration in days
     """
     date = valid_date(date_str)
-    if "month" in date_str:
+    if "month" in date_str or date_str in MONTHS:
         _, duration = calendar.monthrange(date.year, date.month)
     elif "week" in date_str:
         duration = 7

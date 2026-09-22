@@ -23,11 +23,13 @@ from salsa.utils import (
 
 MAX_DESC_LEN = 50
 FENCE = "│"
+CROSS_FENCE = "┼"
+DASH = "─"
 
 
 def _rule(template: str) -> str:
     """Builds a continuous horizontal rule from a column template, crossing at each fence."""
-    return "".join("┼" if ch == FENCE else "─" for ch in template)
+    return "".join(CROSS_FENCE if ch == FENCE else DASH for ch in template)
 
 
 def _dim_row(*cells: str) -> str:
@@ -350,3 +352,42 @@ def salsa_last() -> None:
     print(
         f"\033[1mDeliverables {FENCE}\033[0m", ", ".join([f"{k}: {d}" for k, d in last_task.task.deliverables.items()])
     )
+
+
+def salsa_stats(of: tuple[date, int]) -> None:
+    """Prints hours worked in a period against the targeted hours, and the gap between them.
+
+    The target is 8 hours for every Monday through Friday in the period.
+
+    Args:
+        of (tuple[date, int]): start date and length in days of the period.
+    """
+    start, duration = of
+
+    grouped: dict[UUID, list[LogEntry]] = defaultdict(list)
+    for entry in get_log_iter_range(start, duration):
+        grouped[entry.entry_id].append(entry)
+
+    worked = timedelta(0)
+    for group in grouped.values():
+        session = _compute_session(group)
+        if session:
+            worked += session.duration
+
+    workdays = sum(1 for d in range(duration) if (start + timedelta(days=d)).weekday() < 5)
+    target = timedelta(hours=8 * workdays)
+    diff = worked - target
+
+    end = start + timedelta(days=duration - 1)
+    period_line = "Period  "
+    rest_line = f" {start.isoformat()} — {end.isoformat()}"
+    print(f"\033[1m{period_line}\033[0m{FENCE}{rest_line}")
+    print(DASH * len(period_line) + CROSS_FENCE + DASH * len(rest_line))
+    print(f"\033[1mWorked  {FENCE}\033[0m", format_td(worked))
+    print(f"\033[1mTarget  {FENCE}\033[0m", format_td(target))
+    if diff < timedelta(0):
+        print(f"\033[1mMissing {FENCE}\033[0m \033[1;31m{format_td(-diff)}\033[0m")
+    else:
+        print(f"\033[1mExtra   {FENCE}\033[0m \033[1;32m{format_td(diff)}\033[0m")
+    if workdays > 0:
+        print(f"\033[1mAverage {FENCE}\033[0m {worked.total_seconds() / workdays / 3600:.3f} hours / day")

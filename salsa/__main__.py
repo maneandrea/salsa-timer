@@ -20,7 +20,7 @@ Usage:
 import argparse
 from importlib.metadata import version as _pkg_version
 
-from salsa.query import salsa_clear, salsa_last, salsa_log, salsa_show, salsa_status, salsa_today
+from salsa.query import salsa_clear, salsa_last, salsa_log, salsa_show, salsa_stats, salsa_status, salsa_today
 from salsa.timer import salsa_edit, salsa_pause, salsa_resume, salsa_start, salsa_stop, salsa_task, salsa_undo
 from salsa.utils import valid_date, valid_date_and_duration, valid_time
 
@@ -121,6 +121,14 @@ def main() -> None:
         "-e", "--editor", help="Use this text editor to edit the entry (default: vim)", default="vim"
     )
 
+    stats_parser = subparsers.add_parser("stats", help="See statistics for a given period")
+    stats_parser.add_argument(
+        "--of",
+        type=valid_date_and_duration,
+        default=valid_date_and_duration("this month"),
+        help="Show stats of the given period (YYYY-MM-DD) or a phrase like 'last month' or 'this week'",
+    )
+
     args = parser.parse_args()
 
     if args.version:
@@ -153,6 +161,8 @@ def main() -> None:
         salsa_last()
     elif args.command == "edit":
         salsa_edit(args.date, args.editor)
+    elif args.command == "stats":
+        salsa_stats(args.of)
     else:
         salsa_status()
 
