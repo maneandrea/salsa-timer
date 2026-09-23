@@ -1,11 +1,14 @@
 import os
 from collections import defaultdict
 from collections.abc import Callable
+from copy import copy
 from datetime import date, datetime, timedelta
+from math import ceil, floor
 from time import sleep
 from typing import Literal
 from uuid import UUID
 
+import plotext as plt
 import pyperclip
 
 from salsa.types import EntryEvent, LogEntry, SessionEntry, SessionTask, TaskEvent
@@ -365,11 +368,25 @@ def salsa_stats(of: tuple[date, int], until: date | None = None) -> None:
     start, duration = of
     if until and until > start:
         duration = (until - start).days + 1
-        print("DURATION", duration)
 
     grouped: dict[UUID, list[LogEntry]] = defaultdict(list)
     for entry in get_log_iter_range(start, duration):
         grouped[entry.entry_id].append(entry)
+
+    work_dict: dict[date, timedelta] = {}
+    workdays = 0
+    past = 0
+    futures = 0
+    today = datetime.today().date()
+    for d in range(duration):
+        current = start + timedelta(days=d)
+        if current.weekday() < 5:
+            workdays += 1
+            if current >= today:
+                futures += 1
+            else:
+                work_dict[current] = timedelta(0)
+                past += 1
 
     worked = timedelta(0)
     worked_not_today = timedelta(0)
@@ -378,19 +395,8 @@ def salsa_stats(of: tuple[date, int], until: date | None = None) -> None:
         if session:
             worked += session.duration
             if session.start.date() < datetime.today().date():
+                work_dict[session.start.date()] += session.duration
                 worked_not_today += session.duration
-
-    workdays = 0
-    past = 0
-    futures = 0
-    today = datetime.today().date()
-    for d in range(duration):
-        if (start + timedelta(days=d)).weekday() < 5:
-            workdays += 1
-            if start + timedelta(days=d) >= today:
-                futures += 1
-            else:
-                past += 1
 
     target = timedelta(hours=8 * workdays)
     diff = worked - target
@@ -412,3 +418,97 @@ def salsa_stats(of: tuple[date, int], until: date | None = None) -> None:
 
     if futures > 0 and diff_not_today < timedelta(0):
         print(f"\033[1mAim to  {FENCE}\033[0m {-diff_not_today.total_seconds() / futures / 3600:.3f} hours / day")
+
+    print(DASH * len(period_line) + DASH + DASH * len(rest_line))
+    cumulative: dict[date, timedelta] = {}
+    accumulator = timedelta(hours=8)
+    for day, dur in work_dict.items():
+        accumulator += dur - timedelta(hours=8)
+        cumulative[day] = copy(accumulator)
+
+    _plot_work(work_dict, cumulative)
+
+
+def _plot_work(work_dict: dict[date, timedelta], cumulative: dict[date, timedelta]) -> None:
+    """Plots daily worked hours as bars and the cumulative balance against the 8 hour target as a line.
+
+    Bars reaching the 8 hour target are green, the ones below it are red.
+
+    Args:
+        work_dict (dict[date, timedelta]): Hours worked per day.
+        cumulative (dict[date, timedelta]): Running balance against the target at each day.
+    """
+    days = sorted(work_dict)
+    if not days:
+        return
+
+    positions = list(range(1, len(days) + 1))
+    labels = [f"{_weekday(day.weekday())} {day.day:02d}" for day in days]
+    hours = [work_dict[day].total_seconds() / 3600 for day in days]
+    balances = [cumulative[day].total_seconds() / 3600 for day in days]
+
+    green = plt.marker("full", plt.pixel(foreground="green"))
+    red = plt.marker("full", plt.pixel(foreground="red"))
+    bar_markers = [green if h >= 7.9 else red for h in hours]
+
+    fig = plt.figure
+    fig.clear()
+    fig.theme("simple")
+    fig.plot_size(height=20)
+    fig.title("Hours per day (bars) · Cumulative balance vs 8h (line)")
+    fig.draw(fig.bar(positions, hours, marker=bar_markers, width=0.6))
+    fig.ruler("x").ticks(positions, labels)
+    y_upper = max(8.0, *hours, *balances)
+    fig.ruler("y").lim(0, y_upper)
+    fig.ruler("y").ticks(_hour_ticks(y_upper))
+    bars_only = fig.build().copy()
+
+    balance_line = fig.signal(positions, balances, marker=plt.marker("braille", plt.pixel(foreground="blue")))
+    balance_line.lines()
+    fig.draw(balance_line)
+    combined = fig.build()
+    _paint_under_line(bars_only, combined, line_color="blue", bar_colors=["green", "red"])
+    combined.print()
+
+
+def _paint_under_line(bars_only: plt.matrix, combined: plt.matrix, line_color: str, bar_colors: list[str]) -> None:
+    """Gives the line cells drawn over a bar the bar color as background, so the line doesn't cut holes in the bars.
+
+    plotext replaces the whole cell pixel when a marker lands on it, so the bar color is recovered from a render
+    of the same figure without the line.
+
+    Args:
+        bars_only (plt.matrix): Rendered figure with the bars only.
+        combined (plt.matrix): Rendered figure with bars and line, same size as `bars_only`. Modified in place.
+        line_color (str): Color name of the line.
+        bar_colors (list[str]): Color names of the bars.
+    """
+    # Pixels read back as RGB: map them to the names so repainted cells keep the terminal palette shades
+    bar_color_map = {plt.pixel(foreground=name).foreground(): name for name in bar_colors}
+    for row in range(combined.height()):
+        for col in range(combined.width()):
+            bar_color = bar_color_map.get(bars_only.get(row, col).foreground())
+            if bar_color is None or combined.get(row, col).foreground() == bars_only.get(row, col).foreground():
+                continue
+            combined._set_pixel(col, row, plt.pixel(foreground=line_color, background=bar_color))
+
+
+def _hour_ticks(upper: float) -> list[float]:
+    """Builds evenly spaced hour ticks from 0 up to `upper`, always including the 8 hour target and
+    with higher density around 8.
+
+    The step is always a divisor or a multiple of 8, so the target falls on the regular grid.
+
+    Args:
+        upper (float): Upper limit of the axis.
+
+    Returns:
+        list[float]: Tick positions.
+    """
+    if upper <= 12:
+        step = 4
+    elif upper <= 24:
+        step = 8
+    else:
+        step = 8 * ceil(upper / 40)
+    return list({float(t) for t in range(0, floor(upper) + 1, step)} | {7.0, 8.0, 9.0, upper})

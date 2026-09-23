@@ -1,12 +1,13 @@
 [project]
 name = "salsa"
-version = "0.2.8"
+version = "0.2.9"
 description = "Simple timesheet CLI"
 authors = [{name = "Andrea Manenti", email = "andrea.manenti@proton.me"}]
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "pyperclip>=1.11.0"
+    "pyperclip>=1.11.0",
+    "plotext>=6.1.0"
 ]
 
 [tool.uv]
