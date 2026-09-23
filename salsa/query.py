@@ -443,7 +443,7 @@ def _plot_work(work_dict: dict[date, timedelta], cumulative: dict[date, timedelt
         return
 
     positions = list(range(1, len(days) + 1))
-    labels = [f"{_weekday(day.weekday())} {day.day:02d}" for day in days]
+    labels = [f"{_weekday(day.weekday())[:2]} {day.day:02d}" for day in days]
     hours = [work_dict[day].total_seconds() / 3600 for day in days]
     balances = [cumulative[day].total_seconds() / 3600 for day in days]
 
