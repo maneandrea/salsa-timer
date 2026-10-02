@@ -394,9 +394,15 @@ def salsa_stats(of: tuple[date, int], until: date | None = None) -> None:
         session = _compute_session(group)
         if session:
             worked += session.duration
-            if session.start.date() < datetime.today().date():
+            current = session.start.date()
+            today = datetime.today().date()
+            if current < today:
                 work_dict[session.start.date()] += session.duration
                 worked_not_today += session.duration
+            elif current == today and session.end is not None:
+                if current not in work_dict:
+                    work_dict[current] = timedelta(0)
+                work_dict[current] += session.duration
 
     target = timedelta(hours=8 * workdays)
     diff = worked - target
