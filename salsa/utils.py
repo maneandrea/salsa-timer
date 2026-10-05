@@ -360,3 +360,18 @@ def coalesce_time(override_time: time | None) -> datetime:
     if override_time is None:
         return now
     return datetime.combine(now.date(), override_time)
+
+
+def salsa_set_def_cat(category: str):
+    """Sets the default category in a configuration file"""
+    with open(Path(BASE_DIR) / ".category.conf", "w") as c:
+        c.write(category + "\n")
+
+
+def salsa_get_def_cat() -> str:
+    """Sets the default category in a configuration file"""
+    try:
+        with open(Path(BASE_DIR) / ".category.conf", "r") as c:
+            return c.read().strip()
+    except FileNotFoundError:
+        return "Default category"

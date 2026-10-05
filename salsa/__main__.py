@@ -22,7 +22,7 @@ from importlib.metadata import version as _pkg_version
 
 from salsa.query import salsa_clear, salsa_last, salsa_log, salsa_show, salsa_stats, salsa_status, salsa_today
 from salsa.timer import salsa_edit, salsa_pause, salsa_resume, salsa_start, salsa_stop, salsa_task, salsa_undo
-from salsa.utils import valid_date, valid_date_and_duration, valid_time
+from salsa.utils import salsa_set_def_cat, valid_date, valid_date_and_duration, valid_time
 
 
 def main() -> None:
@@ -44,6 +44,7 @@ def main() -> None:
         metavar=("KEY", "VALUE"),
         help="Optional deliverable as evidence of the task, passed by key and value. May be passed multiple times",
     )
+    stop_parser.add_argument("-c", "--category", help="Category of the last task")
 
     log_parser = subparsers.add_parser("log", help="Show log entries")
     date_spec = log_parser.add_mutually_exclusive_group()
@@ -95,6 +96,7 @@ def main() -> None:
         metavar=("KEY", "VALUE"),
         help="Optional deliverable as evidence of the task, passed by key and value. May be passed multiple times",
     )
+    task_parser.add_argument("-c", "--category", help="Category of the completed task")
     task_parser.add_argument(
         "-p",
         "--pause",
@@ -134,6 +136,11 @@ def main() -> None:
         help="Optionally specify the upper bound for the stats if it isn't a simple period like day, week or month",
     )
 
+    setcat_parser = subparsers.add_parser(
+        "set-default-category", help="Set the name of the category to be assumed when not passed."
+    )
+    setcat_parser.add_argument("category", type=str, help="The name of the default category")
+
     args = parser.parse_args()
 
     if args.version:
@@ -143,7 +150,7 @@ def main() -> None:
     if args.command == "start":
         salsa_start(args.time)
     elif args.command == "stop":
-        salsa_stop(args.time, args.description, deliverables=dict(args.deliverable or []))
+        salsa_stop(args.time, args.description, deliverables=dict(args.deliverable or []), category=args.category)
     elif args.command == "log":
         salsa_log(args.since, args.of, detailed=args.detailed)
     elif args.command == "status":
@@ -159,7 +166,13 @@ def main() -> None:
     elif args.command == "undo":
         salsa_undo()
     elif args.command == "task":
-        salsa_task(args.time, args.description, deliverables=dict(args.deliverable or []), pause=args.pause)
+        salsa_task(
+            args.time,
+            args.description,
+            deliverables=dict(args.deliverable or []),
+            category=args.category,
+            pause=args.pause,
+        )
     elif args.command == "today":
         salsa_today(args.date)
     elif args.command == "last":
@@ -168,6 +181,8 @@ def main() -> None:
         salsa_edit(args.date, args.editor)
     elif args.command == "stats":
         salsa_stats(args.of, args.until)
+    elif args.command == "set-default-category":
+        salsa_set_def_cat(args.category)
     else:
         salsa_status()
 

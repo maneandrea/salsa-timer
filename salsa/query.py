@@ -22,11 +22,13 @@ from salsa.utils import (
     get_log_iter,
     get_log_iter_range,
     get_today_path,
+    salsa_get_def_cat,
 )
 
 MAX_DESC_LEN = 50
 FENCE = "│"
 CROSS_FENCE = "┼"
+BOTTOM = "┴"
 DASH = "─"
 
 
@@ -99,7 +101,11 @@ def _compute_session(group: list[LogEntry]) -> SessionEntry | None:
     if active_task_start:
         task_accumulator += datetime.now() - active_task_start
     if end is None:
-        tasks.append(SessionTask(duration=task_accumulator, end=None, task=TaskEvent(description="", deliverables={})))
+        tasks.append(
+            SessionTask(
+                duration=task_accumulator, end=None, task=TaskEvent(description="", deliverables={}, category=None)
+            )
+        )
 
     if start and entry_id:
         return SessionEntry(
@@ -369,6 +375,8 @@ def salsa_stats(of: tuple[date, int], until: date | None = None) -> None:
     if until and until > start:
         duration = (until - start).days + 1
 
+    default_category = salsa_get_def_cat()
+
     grouped: dict[UUID, list[LogEntry]] = defaultdict(list)
     for entry in get_log_iter_range(start, duration):
         grouped[entry.entry_id].append(entry)
@@ -388,6 +396,7 @@ def salsa_stats(of: tuple[date, int], until: date | None = None) -> None:
                 work_dict[current] = timedelta(0)
                 past += 1
 
+    categories: dict[str, timedelta] = defaultdict(timedelta)
     worked = timedelta(0)
     worked_not_today = timedelta(0)
     for group in grouped.values():
@@ -396,6 +405,12 @@ def salsa_stats(of: tuple[date, int], until: date | None = None) -> None:
             worked += session.duration
             current = session.start.date()
             today = datetime.today().date()
+            for task in session.tasks:
+                current_category = task.task.category
+                if current_category is None:
+                    categories[default_category] += task.duration
+                else:
+                    categories[current_category] += task.duration
             if current < today:
                 work_dict[session.start.date()] += session.duration
                 worked_not_today += session.duration
@@ -424,6 +439,15 @@ def salsa_stats(of: tuple[date, int], until: date | None = None) -> None:
 
     if futures > 0 and diff_not_today < timedelta(0):
         print(f"\033[1mAim to  {FENCE}\033[0m {-diff_not_today.total_seconds() / futures / 3600:.3f} hours / day")
+
+    if len(categories) > 1:
+        total = sum(categories.values(), timedelta(0))
+        print(DASH * len(period_line) + BOTTOM + DASH * len(rest_line))
+        print("\033[1mBreakdown by category:\033[0m")
+        max_len = len(max(categories, key=len)) + 9
+        for category, hours in categories.items():
+            cat = f"\033[3m{category}\033[0m:"
+            print(f"{cat:<{max_len}}", format_td(hours), f"(\033[1m{hours / total * 100:.1f}%\033[0m)")
 
     print(DASH * len(period_line) + DASH + DASH * len(rest_line))
     cumulative: dict[date, timedelta] = {}

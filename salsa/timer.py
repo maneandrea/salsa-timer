@@ -68,10 +68,12 @@ def salsa_pause(override_time: time | None) -> None:
     )
 
 
-def salsa_stop(override_time: time | None, description: str, deliverables: dict[str, str]) -> None:
+def salsa_stop(
+    override_time: time | None, description: str, deliverables: dict[str, str], category: str | None
+) -> None:
     """Stops the running entry, ending the day. The final task and the stop share the same timestamp."""
     when = coalesce_time(override_time)
-    event = TaskEvent(description=description, deliverables=deliverables)
+    event = TaskEvent(description=description, deliverables=deliverables, category=category)
     _transition([EntryEvent.START, EntryEvent.RESUME, TaskEvent.dummy()], event, when)
     _transition([TaskEvent.dummy()], EntryEvent.STOP, when)
 
@@ -95,9 +97,15 @@ def salsa_undo() -> None:
     print(f"Undone: {labels}")
 
 
-def salsa_task(override_time: time | None, description: str, deliverables: dict[str, str], pause: bool = False) -> None:
+def salsa_task(
+    override_time: time | None,
+    description: str,
+    deliverables: dict[str, str],
+    category: str | None,
+    pause: bool = False,
+) -> None:
     """Logs a new task under the running session."""
-    event = TaskEvent(description=description, deliverables=deliverables)
+    event = TaskEvent(description=description, deliverables=deliverables, category=category)
     when = coalesce_time(override_time)
     _transition([EntryEvent.START, EntryEvent.RESUME, TaskEvent.dummy()], event, when)
     if pause:

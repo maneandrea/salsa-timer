@@ -23,6 +23,7 @@ class EventSerialized(TypedDict):
     __event__: str
     description: NotRequired[str]
     deliverables: NotRequired[dict[str, str]]
+    category: NotRequired[str]
 
 
 class EntryEvent(Enum):
@@ -71,11 +72,12 @@ class TaskEvent:
 
     description: str
     deliverables: dict[str, str]
+    category: str | None
 
     @classmethod
     def dummy(cls) -> Self:
         """Build an empty placeholder `TaskEvent`."""
-        return cls("", {})
+        return cls("", {}, None)
 
     def debug(self) -> str:
         """Return a human-readable label for debugging/logging purposes."""
@@ -99,7 +101,14 @@ class TaskEvent:
 
     def serialize(self) -> EventSerialized:
         """Serialize this event to its wire format."""
-        return {"__event__": "TASK", "description": self.description, "deliverables": self.deliverables}
+        to_return: EventSerialized = {
+            "__event__": "TASK",
+            "description": self.description,
+            "deliverables": self.deliverables,
+        }
+        if self.category is not None:
+            to_return["category"] = self.category
+        return to_return
 
     def matches(self, events: list[Event]) -> bool:
         """Check whether a `TaskEvent` is present among a list of events."""
@@ -122,7 +131,8 @@ def parse_event(raw: EventSerialized) -> Event:
     if discriminant == "TASK":
         desc = raw.get("description", "<missing description>")
         deli = raw.get("deliverables", {})
-        return TaskEvent(description=desc, deliverables=deli)
+        cate = raw.get("category")
+        return TaskEvent(description=desc, deliverables=deli, category=cate)
     else:
         return EntryEvent(discriminant)
 
