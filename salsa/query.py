@@ -26,6 +26,7 @@ from salsa.utils import (
 )
 
 MAX_DESC_LEN = 50
+MAX_CAT_LEN = 13
 FENCE = "│"
 CROSS_FENCE = "┼"
 BOTTOM = "┴"
@@ -194,11 +195,13 @@ def salsa_log(since: date | None = None, of: tuple[date, int] | None = None, det
 
         blank_entry = " " * ENTRY_W
 
+        default_category = salsa_get_def_cat()
         for i, sess_task in enumerate(sess.tasks):
+            category = sess_task.task.category if sess_task.task.category else default_category
+            if len(category) > MAX_CAT_LEN:
+                category = category[: MAX_CAT_LEN - 1] + "…"
             tree = "└─" if i == len(sess.tasks) - 1 else "├─"
-            task_time_str = (
-                f"{tree} Task {i + 1:d} ─ {sess_task.end.strftime('%H:%M:%S') if sess_task.end else 'open…'}"
-            )
+            task_time_str = f"{tree} {i + 1:d}. \033[3m{category:<{MAX_CAT_LEN}}\033[0m\033[2m ─ {sess_task.end.strftime('%H:%M:%S') if sess_task.end else 'open…'}"
             task_dur_str = format_td_num(sess_task.duration)
             display = sess_task.task.display()
             if len(display) > MAX_DESC_LEN:
@@ -208,7 +211,8 @@ def salsa_log(since: date | None = None, of: tuple[date, int] | None = None, det
                 task_id_pending = False
             else:
                 first_task_column = blank_entry
-            print(_dim_row(first_task_column, f"{task_time_str:<{TIME_W}}", f"{task_dur_str:<{DUR_W}}", display))
+            # The +12 are the ANSI codes
+            print(_dim_row(first_task_column, f"{task_time_str:<{TIME_W + 12}}", f"{task_dur_str:<{DUR_W}}", display))
 
         if detailed:
             label = " events "
@@ -435,7 +439,7 @@ def salsa_stats(of: tuple[date, int], until: date | None = None) -> None:
     else:
         print(f"\033[1mExtra   {FENCE}\033[0m \033[1;32m{format_td(diff)}\033[0m")
     if past > 0:
-        print(f"\033[1mAverage {FENCE}\033[0m {worked.total_seconds() / past / 3600:.3f} hours / day")
+        print(f"\033[1mAverage {FENCE}\033[0m {worked_not_today.total_seconds() / past / 3600:.3f} hours / day")
 
     if futures > 0 and diff_not_today < timedelta(0):
         print(f"\033[1mAim to  {FENCE}\033[0m {-diff_not_today.total_seconds() / futures / 3600:.3f} hours / day")
