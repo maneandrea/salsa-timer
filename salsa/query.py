@@ -196,10 +196,15 @@ def salsa_log(since: date | None = None, of: tuple[date, int] | None = None, det
         blank_entry = " " * ENTRY_W
 
         default_category = salsa_get_def_cat()
+        prev_category = None
         for i, sess_task in enumerate(sess.tasks):
             category = sess_task.task.category if sess_task.task.category else default_category
             if len(category) > MAX_CAT_LEN:
                 category = category[: MAX_CAT_LEN - 1] + "…"
+            if prev_category == category:
+                category = " " * (len(category) // 2) + "״"
+            else:
+                prev_category = category
             tree = "└─" if i == len(sess.tasks) - 1 else "├─"
             task_time_str = f"{tree} {i + 1:d}. \033[3m{category:<{MAX_CAT_LEN}}\033[0m\033[2m ─ {sess_task.end.strftime('%H:%M:%S') if sess_task.end else 'open…'}"
             task_dur_str = format_td_num(sess_task.duration)
