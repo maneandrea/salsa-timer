@@ -1,4 +1,5 @@
 import os
+import shutil
 from collections import defaultdict
 from collections.abc import Callable
 from copy import copy
@@ -25,7 +26,7 @@ from salsa.utils import (
     salsa_get_def_cat,
 )
 
-MAX_DESC_LEN = 50
+MIN_DESC_LEN = 12
 MAX_CAT_LEN = 13
 FENCE = "│"
 CROSS_FENCE = "┼"
@@ -170,7 +171,9 @@ def salsa_log(since: date | None = None, of: tuple[date, int] | None = None, det
     ENTRY_W = 7
     TIME_W = len("%Y-%m-%d %H:%M:%S") + len("%H:%M:%S") + 5
     DUR_W = 8
-    header = f"{'ENTRY':<{ENTRY_W}} {FENCE} {'TIME':<{TIME_W}} {FENCE} {'DURATION':<{DUR_W}} {FENCE} {'DESCRIPTION':<{MAX_DESC_LEN}}"
+    header_beginning = f"{'ENTRY':<{ENTRY_W}} {FENCE} {'TIME':<{TIME_W}} {FENCE} {'DURATION':<{DUR_W}} {FENCE} "
+    desc_len = max(MIN_DESC_LEN, shutil.get_terminal_size().columns - len(header_beginning))
+    header = f"{header_beginning}{'DESCRIPTION':<{desc_len}}"
     print(header)
     print(_rule(header))
     current_weekday = None
@@ -209,8 +212,8 @@ def salsa_log(since: date | None = None, of: tuple[date, int] | None = None, det
             task_time_str = f"{tree} {i + 1:d}. \033[3m{category:<{MAX_CAT_LEN}}\033[0m\033[2m ─ {sess_task.end.strftime('%H:%M:%S') if sess_task.end else 'open…'}"
             task_dur_str = format_td_num(sess_task.duration)
             display = sess_task.task.display()
-            if len(display) > MAX_DESC_LEN:
-                display = display[: MAX_DESC_LEN - 1] + "…"
+            if len(display) > desc_len:
+                display = display[: desc_len - 1] + "…"
             if task_id_pending:
                 first_task_column = f"{task_id_str:<{ENTRY_W}}"
                 task_id_pending = False
