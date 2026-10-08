@@ -410,13 +410,13 @@ def salsa_stats(of: tuple[date, int], until: date | None = None) -> None:
 
     categories: dict[str, timedelta] = defaultdict(timedelta)
     worked = timedelta(0)
-    worked_not_today = timedelta(0)
+    worked_closed = timedelta(0)
+    today_session_is_closed = False
     for group in grouped.values():
         session = _compute_session(group)
         if session:
             worked += session.duration
             current = session.start.date()
-            today = datetime.today().date()
             for task in session.tasks:
                 current_category = task.task.category
                 if current_category is None:
@@ -425,15 +425,20 @@ def salsa_stats(of: tuple[date, int], until: date | None = None) -> None:
                     categories[current_category] += task.duration
             if current < today:
                 work_dict[session.start.date()] += session.duration
-                worked_not_today += session.duration
+                worked_closed += session.duration
             elif current == today and session.end is not None:
+                # If today's session is closed, increase the past counter only once
                 if current not in work_dict:
                     work_dict[current] = timedelta(0)
+                    past += 1
+                    futures -= 1
+                    today_session_is_closed = True
                 work_dict[current] += session.duration
+                worked_closed += session.duration
 
     target = timedelta(hours=8 * workdays)
     diff = worked - target
-    diff_not_today = worked_not_today - target
+    diff_closed = worked_closed - target
 
     end = start + timedelta(days=duration - 1)
     period_line = "Period  "
@@ -447,10 +452,13 @@ def salsa_stats(of: tuple[date, int], until: date | None = None) -> None:
     else:
         print(f"\033[1mExtra   {FENCE}\033[0m \033[1;32m{format_td(diff)}\033[0m")
     if past > 0:
-        print(f"\033[1mAverage {FENCE}\033[0m {worked_not_today.total_seconds() / past / 3600:.3f} hours / day")
+        print(
+            f"\033[1mAverage {FENCE}\033[0m {worked_closed.total_seconds() / past / 3600:.3f} hours / day",
+            "(including today)" if today_session_is_closed else "",
+        )
 
-    if futures > 0 and diff_not_today < timedelta(0):
-        print(f"\033[1mAim to  {FENCE}\033[0m {-diff_not_today.total_seconds() / futures / 3600:.3f} hours / day")
+    if futures > 0 and diff_closed < timedelta(0):
+        print(f"\033[1mAim to  {FENCE}\033[0m {-diff_closed.total_seconds() / futures / 3600:.3f} hours / day")
 
     if len(categories) > 1:
         total = sum(categories.values(), timedelta(0))
