@@ -27,7 +27,8 @@ from salsa.utils import (
 )
 
 MIN_DESC_LEN = 12
-MAX_CAT_LEN = 13
+SPACING = 2
+MAX_CAT_LEN = 12 + SPACING
 FENCE = "│"
 CROSS_FENCE = "┼"
 BOTTOM = "┴"
@@ -169,7 +170,7 @@ def salsa_log(since: date | None = None, of: tuple[date, int] | None = None, det
         return
 
     ENTRY_W = 7
-    TIME_W = len("%Y-%m-%d %H:%M:%S") + len("%H:%M:%S") + 5
+    TIME_W = len("%Y-%m-%d %H:%M:%S") + len("%H:%M:%S") + SPACING + 4
     DUR_W = 8
     header_beginning = f"{'ENTRY':<{ENTRY_W}} {FENCE} {'TIME':<{TIME_W}} {FENCE} {'DURATION':<{DUR_W}} {FENCE} "
     desc_len = max(MIN_DESC_LEN, shutil.get_terminal_size().columns - len(header_beginning))
@@ -179,7 +180,7 @@ def salsa_log(since: date | None = None, of: tuple[date, int] | None = None, det
     current_weekday = None
     for sess, events in sessions:
         line_weekday = sess.start.weekday()
-        start = sess.start.strftime("%Y-%m-%d %H:%M:%S")
+        start = sess.start.strftime(f"%Y-%m-%d{' ' * SPACING}%H:%M:%S")
         end = sess.end.strftime("%H:%M:%S") if sess.end else ("paused… " if sess.paused() else "running…")
         time_str = f"{start} - {end}"
         duration_str = format_td_num(sess.duration)
