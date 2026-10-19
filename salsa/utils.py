@@ -234,6 +234,32 @@ def format_td(delta: timedelta) -> str:
     return " ".join(parts)
 
 
+def format_td_approx_nice(delta: timedelta) -> str:
+    """Formats a timedelta as a human-readable duration dropping seconds, e.g. "1 hr 2 min".
+
+    Args:
+        delta (timedelta): duration to format.
+
+    Returns:
+        str: human-readable duration.
+    """
+    total_seconds = int(delta.total_seconds())
+
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    parts = []
+
+    if hours:
+        parts.append(f"{hours} hr")
+    if seconds >= 30:
+        minutes += 1
+    if minutes or not parts:
+        parts.append(f"{minutes} min")
+
+    return " ".join(parts)
+
+
 def format_td_num(td: timedelta) -> str:
     """Formats a timedelta as HH:MM:SS."""
     total_sec = int(td.total_seconds())

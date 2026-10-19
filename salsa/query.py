@@ -16,6 +16,7 @@ from salsa.types import EntryEvent, LogEntry, SessionEntry, SessionTask, TaskEve
 from salsa.utils import (
     format_td,
     format_td_approx,
+    format_td_approx_nice,
     format_td_num,
     get_all_paths,
     get_group,
@@ -454,12 +455,12 @@ def salsa_stats(of: tuple[date, int], until: date | None = None) -> None:
         print(f"\033[1mExtra   {FENCE}\033[0m \033[1;32m{format_td(diff)}\033[0m")
     if past > 0:
         print(
-            f"\033[1mAverage {FENCE}\033[0m {worked_closed.total_seconds() / past / 3600:.3f} hours / day",
+            f"\033[1mAverage {FENCE}\033[0m {format_td_approx_nice(worked_closed / past)} / day",
             "(including today)" if today_session_is_closed else "",
         )
 
     if futures > 0 and diff_closed < timedelta(0):
-        print(f"\033[1mAim to  {FENCE}\033[0m {-diff_closed.total_seconds() / futures / 3600:.3f} hours / day")
+        print(f"\033[1mAim to  {FENCE}\033[0m {format_td_approx_nice(-diff_closed / futures)} / day")
 
     if len(categories) > 1:
         total = sum(categories.values(), timedelta(0))
