@@ -352,8 +352,12 @@ def salsa_today(override_date: date | None) -> None:
         sentences.append(sess_task.task.description.strip(" .") + ".")
     print(" ".join(sentences))
     print("—" * len(total_line))
-    pyperclip.copy("\n".join(["\t".join(cols) for cols in rows]))
-    print("Content copied to clipboard ✓")
+    try:
+        pyperclip.copy("\n".join(["\t".join(cols) for cols in rows]))
+        print("Content copied to clipboard ✓")
+    except Exception as e:
+        first_line = str(e).split("\n")[0]
+        print(f"Clipboard not available: {first_line}")
 
 
 def salsa_last() -> None:
