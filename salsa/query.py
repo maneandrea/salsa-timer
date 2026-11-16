@@ -219,7 +219,10 @@ def salsa_log(since: date | None = None, of: tuple[date, int] | None = None, det
         if sess.vacation:
             print(
                 _dim_row(
-                    blank_entry, f"\033[3m{'Vacation':<{TIME_W}}\033[0m\033[2m", f"{DASH:^{DUR_W}}", sess.vacation.name
+                    f"{task_id_str:<{ENTRY_W}}",
+                    f"\033[3m{'Vacation':<{TIME_W}}\033[0m\033[2m",
+                    f"{DASH:^{DUR_W}}",
+                    sess.vacation.name,
                 )
             )
             continue
