@@ -12,7 +12,7 @@ from uuid import UUID
 import plotext as plt
 import pyperclip
 
-from salsa.types import EntryEvent, LogEntry, SessionEntry, SessionTask, TaskEvent
+from salsa.types import EntryEvent, LogEntry, SessionEntry, SessionTask, TaskEvent, VacationEvent
 from salsa.utils import (
     format_td,
     format_td_approx,
@@ -90,6 +90,19 @@ def _compute_session(group: list[LogEntry]) -> SessionEntry | None:
                     task_accumulator += e.datetime - active_task_start
                 active_start = None
                 active_task_start = None
+        elif isinstance(e.event, VacationEvent):
+            dur = timedelta(hours=8)
+            end = e.datetime + dur
+            return SessionEntry(
+                entry_id=e.entry_id,
+                start=e.datetime,
+                end=end,
+                active_start=None,
+                duration=dur,
+                tasks=[],
+                vacation=e.event,
+                current_task_duration=timedelta(hours=8),
+            )
         else:
             if active_task_start:
                 task_accumulator += e.datetime - active_task_start
@@ -202,6 +215,15 @@ def salsa_log(since: date | None = None, of: tuple[date, int] | None = None, det
 
         default_category = salsa_get_def_cat()
         prev_category = None
+
+        if sess.vacation:
+            print(
+                _dim_row(
+                    blank_entry, f"\033[3m{'Vacation':<{TIME_W}}\033[0m\033[2m", f"{DASH:^{DUR_W}}", sess.vacation.name
+                )
+            )
+            continue
+
         for i, sess_task in enumerate(sess.tasks):
             category = sess_task.task.category if sess_task.task.category else default_category
             if len(category) > MAX_CAT_LEN:
@@ -418,9 +440,14 @@ def salsa_stats(of: tuple[date, int], until: date | None = None) -> None:
     worked = timedelta(0)
     worked_closed = timedelta(0)
     today_session_is_closed = False
+    vacations = timedelta(0)
     for group in grouped.values():
         session = _compute_session(group)
         if session:
+            if session.vacation:
+                vacations += timedelta(hours=8)
+                continue
+
             worked += session.duration
             current = session.start.date()
             for task in session.tasks:
@@ -442,7 +469,7 @@ def salsa_stats(of: tuple[date, int], until: date | None = None) -> None:
                 work_dict[current] += session.duration
                 worked_closed += session.duration
 
-    target = timedelta(hours=8 * workdays)
+    target = timedelta(hours=8 * workdays) - vacations
     diff = worked - target
     diff_closed = worked_closed - target
 

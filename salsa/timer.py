@@ -4,7 +4,7 @@ from datetime import date, datetime, time
 from json import JSONDecodeError
 from uuid import uuid4
 
-from salsa.types import EntryEvent, Event, LogEntry, TaskEvent
+from salsa.types import EntryEvent, Event, LogEntry, TaskEvent, VacationEvent
 from salsa.utils import (
     append_data,
     coalesce_time,
@@ -137,3 +137,32 @@ def salsa_edit(override_date: date | None, editor: str) -> None:
         print(f"Edited file was left in a corrupted state: {reason}{e}. Restoring backup.")
         with open(path, "w+") as res:
             res.write(backup)
+
+
+def salsa_vacation(name: str, override_date: date | None) -> None:
+    """Registers a vacation for this day so that it is not counted as a work day for the total hours target"""
+    if not is_stopped():
+        print("A session is already running. Stop it first.")
+        return
+    if override_date is None:
+        when = datetime.now()
+    else:
+        when = datetime.combine(override_date, time(8, 0, 0))
+    entry_id = uuid4()
+    start = LogEntry(
+        entry_id=entry_id,
+        event=EntryEvent.START,
+        datetime=when,
+    )
+    entry = LogEntry(
+        entry_id=entry_id,
+        event=VacationEvent(name=name),
+        datetime=when,
+    )
+    end = LogEntry(
+        entry_id=entry_id,
+        event=EntryEvent.STOP,
+        datetime=when,
+    )
+    append_data(get_today_path(override_date), [start, entry, end])
+    print(f"Registered vacation: ({entry_id.hex[:6]}…)")

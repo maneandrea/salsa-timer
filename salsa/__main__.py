@@ -21,7 +21,16 @@ import argparse
 from importlib.metadata import version as _pkg_version
 
 from salsa.query import salsa_clear, salsa_last, salsa_log, salsa_show, salsa_stats, salsa_status, salsa_today
-from salsa.timer import salsa_edit, salsa_pause, salsa_resume, salsa_start, salsa_stop, salsa_task, salsa_undo
+from salsa.timer import (
+    salsa_edit,
+    salsa_pause,
+    salsa_resume,
+    salsa_start,
+    salsa_stop,
+    salsa_task,
+    salsa_undo,
+    salsa_vacation,
+)
 from salsa.utils import salsa_set_def_cat, valid_date, valid_date_and_duration, valid_time
 
 
@@ -141,6 +150,15 @@ def main() -> None:
     )
     setcat_parser.add_argument("category", type=str, help="The name of the default category")
 
+    vacation_parser = subparsers.add_parser("vacation", help="Register a vacation for this day")
+    vacation_parser.add_argument("name", type=str, help="Reason of this day off")
+    vacation_parser.add_argument(
+        "-d",
+        "--date",
+        help="Use a date other than today (YYYY-MM-DD or words like 'yesterday' or '3 days ago')",
+        type=valid_date,
+    )
+
     args = parser.parse_args()
 
     if args.version:
@@ -181,6 +199,8 @@ def main() -> None:
         salsa_edit(args.date, args.editor)
     elif args.command == "stats":
         salsa_stats(args.of, args.until)
+    elif args.command == "vacation":
+        salsa_vacation(args.name, args.date)
     elif args.command == "set-default-category":
         salsa_set_def_cat(args.category)
     else:

@@ -6,7 +6,7 @@ from enum import Enum
 from typing import NotRequired, Self, TypedDict
 from uuid import UUID
 
-type Event = TaskEvent | EntryEvent
+type Event = TaskEvent | EntryEvent | VacationEvent
 # Plain (de)serialized shape of a TaskEvent, used where a TypedDict is preferred over a functional alias.
 TaskEventDict = TypedDict("TaskEventDict", {"description": str, "deliverables": dict[str, str]})
 
@@ -115,6 +115,33 @@ class TaskEvent:
         return any(isinstance(e, TaskEvent) for e in events)
 
 
+@dataclass
+class VacationEvent:
+    name: str
+
+    def serialize(self) -> EventSerialized:
+        return {"__event__": "VACATION", "description": self.name}
+
+    def display(self) -> str:
+        return f"Vacation: {self.name}"
+
+    def verb(self) -> str:
+        """Return the present-tense verb phrase describing this event."""
+        return "register vacations for"
+
+    def past_verb(self) -> str:
+        """Return the past-tense verb phrase describing this event."""
+        return "Registered vacation"
+
+    def debug(self) -> str:
+        """Return a human-readable label for debugging/logging purposes."""
+        return "VACATION event"
+
+    def matches(self, events: list[Event]) -> bool:
+        """Check whether a `VacationEvent` is present among a list of events."""
+        return any(isinstance(e, VacationEvent) for e in events)
+
+
 def parse_event(raw: EventSerialized) -> Event:
     """Deserialize a wire-format event back into an `Event`.
 
@@ -133,6 +160,9 @@ def parse_event(raw: EventSerialized) -> Event:
         deli = raw.get("deliverables", {})
         cate = raw.get("category")
         return TaskEvent(description=desc, deliverables=deli, category=cate)
+    elif discriminant == "VACATION":
+        desc = raw.get("description", "PTO")
+        return VacationEvent(name=desc)
     else:
         return EntryEvent(discriminant)
 
@@ -199,6 +229,7 @@ class SessionEntry:
     duration: timedelta
     tasks: list[SessionTask]
     current_task_duration: timedelta
+    vacation: VacationEvent | None = None
 
     def paused(self) -> bool:
         """Check whether the session is currently paused."""

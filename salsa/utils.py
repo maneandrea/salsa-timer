@@ -337,6 +337,9 @@ def valid_date(date_str: str) -> date:
         return dt.date()
     elif date_str == "today":
         return datetime.today().date()
+    elif date_str == "tomorrow":
+        dt = datetime.today() + timedelta(days=1)
+        return dt.date()
     elif m := re.match(r"(\d+) days ago", date_str):
         dt = datetime.today() - timedelta(days=int(m.group(1)))
         return dt.date()
