@@ -444,11 +444,13 @@ def salsa_stats(of: tuple[date, int], until: date | None = None) -> None:
     worked_closed = timedelta(0)
     today_session_is_closed = False
     vacations = timedelta(0)
+    vacation_days = set()
     for group in grouped.values():
         session = _compute_session(group)
         if session:
             if session.vacation:
                 vacations += timedelta(hours=8)
+                vacation_days.add(session.start.date())
                 continue
 
             worked += session.duration
@@ -509,7 +511,10 @@ def salsa_stats(of: tuple[date, int], until: date | None = None) -> None:
     cumulative: dict[date, timedelta] = {}
     accumulator = timedelta(hours=8)
     for day, dur in work_dict.items():
-        accumulator += dur - timedelta(hours=8)
+        if day not in vacation_days:
+            accumulator += dur - timedelta(hours=8)
+        else:
+            accumulator += dur
         cumulative[day] = copy(accumulator)
 
     _plot_work(work_dict, cumulative)
